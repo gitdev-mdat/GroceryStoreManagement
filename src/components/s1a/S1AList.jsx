@@ -3,33 +3,18 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { formatVnd } from '../FormatNumber'
 import { formatDateDisplay } from '../FormatDate'
 
-// Skeleton Components
-function TableSkeleton() {
+// Skeleton Component
+function MobileCardSkeleton() {
   return (
     <>
       {[1, 2, 3].map((i) => (
-        <tr key={i}>
-          <td className="px-3 py-3"><div className="h-4 w-20 rounded bg-slate-200 animate-pulse" /></td>
-          <td className="px-3 py-3"><div className="h-4 w-32 rounded bg-slate-200 animate-pulse" /></td>
-          <td className="px-3 py-3"><div className="h-4 w-48 rounded bg-slate-200 animate-pulse" /></td>
-          <td className="px-3 py-3 number-cell"><div className="h-4 w-24 rounded bg-slate-200 animate-pulse ml-auto" /></td>
-        </tr>
-      ))}
-    </>
-  )
-}
-
-function CardSkeleton() {
-  return (
-    <>
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-3">
-          <div className="flex justify-between items-center mb-1.5">
-            <div className="h-5 w-28 rounded bg-slate-200 animate-pulse" />
+        <div key={i} className="py-4 border-b border-gray-100">
+          <div className="flex justify-between items-center">
             <div className="h-5 w-24 rounded bg-slate-200 animate-pulse" />
+            <div className="h-5 w-20 rounded bg-slate-200 animate-pulse" />
           </div>
-          <div className="h-3 w-3/4 rounded bg-slate-200 animate-pulse mb-1.5" />
-          <div className="h-3 w-1/2 rounded bg-slate-200 animate-pulse" />
+          <div className="h-3 w-32 rounded bg-slate-200 animate-pulse mt-2" />
+          <div className="h-3 w-48 rounded bg-slate-200 animate-pulse mt-1" />
         </div>
       ))}
     </>
@@ -186,94 +171,70 @@ export default function S1AList({ onNotify, onRefresh }) {
         </select>
       </div>
 
-      {/* Desktop: Table View */}
-      <div className="hidden md:block overflow-x-auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Ngày tháng</th>
-              <th>Số phiếu</th>
-              <th>Diễn giải</th>
-              <th className="number-cell">Số tiền (VND)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <TableSkeleton />
-            ) : monthRows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center text-ink-muted py-8">
-                  {isSupabaseConfigured()
-                    ? 'Không có dữ liệu trong kỳ này.'
-                    : 'Chưa kết nối Supabase. Vui lòng cấu hình .env.local'}
-                </td>
-              </tr>
-            ) : (
-              monthRows.map((ticket) => (
-                <tr key={ticket.id}>
-                  <td className="whitespace-nowrap">{formatDateDisplay(ticket.sale_date)}</td>
-                  <td className="whitespace-nowrap">{ticket.ticket_number || '—'}</td>
-                  <td className="text-ink-muted italic">{ticket.notes || '—'}</td>
-                  <td className="number-cell">{formatVnd(ticket.total_amount)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-          {!loading && monthRows.length > 0 && (
-            <tfoot>
-              <tr className="bg-slate-50 font-semibold">
-                <td colSpan={2} className="text-right">
-                  Tổng cộng {totalTickets} phiếu phát sinh
-                </td>
-                <td>Tổng</td>
-                <td className="number-cell text-emerald-700">
-                  {totalAmount.toLocaleString('vi-VN')} VND
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
+      {/* ========================== */}
+      {/* CARD LIST VIEW - Always visible */}
+      {/* ========================== */}
 
-      {/* Mobile: Card List View */}
-      <div className="block md:hidden">
-        {loading ? (
-          <CardSkeleton />
-        ) : monthRows.length === 0 ? (
-          <div className="text-center text-slate-400 py-8 text-sm">
-            {isSupabaseConfigured() ? 'Không có dữ liệu trong kỳ này.' : 'Chưa kết nối Supabase.'}
+      {/* Loading State */}
+      {loading && <MobileCardSkeleton />}
+
+      {/* Empty State */}
+      {!loading && monthRows.length === 0 && (
+        <div className="text-center text-slate-400 py-8 text-sm">
+          {isSupabaseConfigured() ? 'Không có dữ liệu trong kỳ này.' : 'Chưa kết nối Supabase.'}
+        </div>
+      )}
+
+      {/* Card List */}
+      {!loading && monthRows.length > 0 && (
+        <>
+          {monthRows.map((ticket) => (
+            <div
+              key={ticket.id}
+              className="py-4 border-b border-gray-100 last:border-b-0"
+            >
+              {/* Row 1: Date | Amount */}
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-slate-900">
+                  {formatDateDisplay(ticket.sale_date)}
+                </span>
+                <span className="font-bold text-green-600 tabular-nums whitespace-nowrap pl-4">
+                  {formatVnd(ticket.total_amount)}
+                </span>
+              </div>
+              {/* Row 2: Ticket ID */}
+              <div className="mt-1">
+                <span className="text-xs text-gray-400">
+                  Mã phiếu: {ticket.ticket_number || '—'}
+                </span>
+              </div>
+              {/* Row 3: Notes */}
+              <div className="mt-0.5">
+                <span className="text-xs text-gray-600 leading-relaxed break-words">
+                  {ticket.notes || '—'}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {/* Summary Card */}
+          <div className="my-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-sm text-emerald-800 font-semibold">
+                  Tổng cộng {totalTickets} phiếu
+                </span>
+                <span className="block text-xs text-emerald-600 mt-0.5">
+                  Tháng {filterMonth}
+                </span>
+              </div>
+              <span className="text-lg font-bold text-emerald-700 tabular-nums whitespace-nowrap">
+                {formatVnd(totalAmount)}
+              </span>
+            </div>
           </div>
-        ) : (
-          <>
-            {monthRows.map((ticket) => (
-              <div key={ticket.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-3 flex flex-col gap-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-900">{formatDateDisplay(ticket.sale_date)}</span>
-                  <span className="font-bold text-emerald-600 text-base">
-                    {formatVnd(ticket.total_amount)} VND
-                  </span>
-                </div>
-                <span className="text-xs text-slate-500">{ticket.ticket_number || '—'}</span>
-                <span className="text-xs text-slate-400 italic">{ticket.notes || '—'}</span>
-              </div>
-            ))}
-            {monthRows.length > 0 && (
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl mt-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm text-emerald-800 font-medium">Tổng cộng {totalTickets} phiếu</span>
-                    <br />
-                    <span className="text-xs text-emerald-600">Tháng {filterMonth}</span>
-                  </div>
-                  <span className="text-lg font-bold text-emerald-700">
-                    {totalAmount.toLocaleString('vi-VN')} VND
-                  </span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }

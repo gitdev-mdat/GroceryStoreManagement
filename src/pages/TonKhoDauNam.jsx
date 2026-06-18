@@ -34,12 +34,9 @@ function totalFromRows(rows) {
 }
 
 export default function TonKhoDauNam() {
-  const { inventory, setInventory, resetInventoryToDefault } = useApp();
-  const printRef = useRef(null);
-  const modalPrintRef = useRef(null);
+  const { inventory, setInventory } = useApp();
   const detailsRef = useRef(null);
   const summaryRef = useRef(null);
-  const [activeTab, setActiveTab] = useState("list");
   const [showDetails, setShowDetails] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -85,35 +82,8 @@ export default function TonKhoDauNam() {
     setInventory(next);
   };
 
-  const subTabs = [
-    { id: "list", label: "Biên bản kiểm kê", icon: "📋" },
-    { id: "reset", label: "Khôi phục số liệu", icon: "🔄" },
-  ];
-
   const handleExportPDF = () => {
     setExportOpen(false);
-    setTimeout(() => {
-      const content = modalPrintRef.current || printRef.current;
-      if (!content) return;
-      const printWin = window.open("", "_blank", "width=1024,height=768");
-      if (!printWin) return;
-      printWin.document.write(`<!DOCTYPE html><html><head><title>Biên bản kiểm kê</title>
-        <style>
-          body{font-family:Arial,sans-serif;color:#111;padding:32px;}
-          table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px;}
-          th,td{border:1px solid #222;padding:6px 8px;text-align:left;vertical-align:top;}
-          th{background:#f5f5f5;font-weight:700;}
-          .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-          h1{font-size:18px;text-transform:uppercase;text-align:center;margin:0 0 8px;}
-          h2{font-size:15px;text-align:center;font-weight:600;margin:0 0 12px;}
-          .meta{font-size:13px;margin-bottom:18px;}
-          .sig{margin-top:32px;display:flex;justify-content:space-between;font-size:13px;}
-        </style></head><body>`);
-      printWin.document.write(content.innerHTML);
-      printWin.document.write(`</body></html>`);
-      printWin.document.close();
-      setTimeout(() => printWin.print(), 300);
-    }, 10);
   };
 
   const handleExportExcel = () => {
@@ -126,194 +96,186 @@ export default function TonKhoDauNam() {
 
   return (
     <div className="page-shell">
-      <div className="page-topbar">
-        <div className="page-topbar-left">
-          <h1 className="page-title">Tồn kho đầu năm</h1>
-          <p className="page-subtitle">
-            Biên bản kiểm kê hàng tồn kho · Thời điểm: 00:00 ngày 01/01/2026
+      {/* ── Header ───────────────────────────────────────────── */}
+      <div className="page-topbar-new">
+        <div className="page-topbar-text">
+          <h1 className="page-title-new">Tồn kho đầu năm</h1>
+          <p className="page-subtitle-new">
+            Biên bản kiểm kê hàng tồn kho &nbsp;·&nbsp; Thời điểm: 00:00 ngày 01/01/2026
           </p>
         </div>
-        <nav className="page-tabs">
-          {subTabs.map(({ id, label, icon }) => (
-            <button
-              key={id}
-              type="button"
-              className={`page-tab${activeTab === id ? " active" : ""}`}
-              onClick={() => setActiveTab(id)}
-            >
-              <span>{icon}</span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
       </div>
 
-      {activeTab === "list" && (
-        <div className="card inventory-main-card">
-          {/* ── Section 1 + 2: Mobile-first single column cards ── */}
-          <div className="inventory-meta-section">
-            <div className="info-card">
-              <div className="info-card-title">
-                <span className="info-card-icon" aria-hidden="true">🏪</span>
-                <span>Thông tin hộ kinh doanh</span>
-              </div>
-              <div className="info-fields">
-                <div className="info-field">
-                  <span className="info-label">Tên hộ kinh doanh</span>
-                  <span className="info-value">Hộ Kinh Doanh Tạp hoá Hải Kiều</span>
-                </div>
-                <div className="info-field">
-                  <span className="info-label">Mã số thuế</span>
-                  <span className="info-value">051179002157</span>
-                </div>
-                <div className="info-field">
-                  <span className="info-label">Địa chỉ</span>
-                  <span className="info-value">Thôn 10, Xã Quảng Tín, Tỉnh Lâm Đồng, Việt Nam</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="info-card">
-              <div className="info-card-title">
-                <span className="info-card-icon" aria-hidden="true">👥</span>
-                <span>Ban kiểm kê thực tế</span>
-              </div>
-              <div className="info-fields">
-                <div className="info-field">
-                  <span className="info-label">Trưởng ban</span>
-                  <span className="info-value">Phạm Thị Thuý Kiều</span>
-                </div>
-              </div>
+      {/* ── Main Content ─────────────────────────────────────── */}
+      <div className="inventory-content">
+        {/* ── Stat Hero ── */}
+        <div className="stat-hero" ref={summaryRef}>
+          <div className="stat-hero-inner">
+            <div className="stat-hero-label">Tổng cộng giá trị tồn kho</div>
+            <div className="stat-hero-value">{formatVnd(total)}</div>
+            <div className="stat-hero-meta">
+              <span className="stat-hero-date">Ngày 31 tháng 12 năm 2025</span>
+              <button
+                type="button"
+                className="btn-details-toggle"
+                onClick={toggleDetails}
+              >
+                {showDetails ? "Ẩn chi tiết" : "Xem chi tiết"}
+              </button>
             </div>
           </div>
-
-          <div className="inventory-summary-section">
-            <p className="inventory-summary-label">3. Kết quả kiểm kê hàng hóa thực tế</p>
-
-            <div className="inventory-summary-card" ref={summaryRef}>
-              <div className="inventory-summary-card-top">
-                <div>
-                  <p className="inventory-summary-tag">TỔNG CỘNG GIÁ TRỊ TỒN KHO</p>
-                  <p className="inventory-summary-value">{formatVnd(total)}</p>
-                  <p className="inventory-summary-date">Ngày 31 tháng 12 năm 2025</p>
-                </div>
-                <div className="inventory-summary-actions">
-                  <button type="button" className="btn btn-ghost" onClick={toggleDetails}>
-                    {showDetails ? "🙈 Ẩn chi tiết" : "👁 Xem chi tiết"}
+          <div className="stat-hero-actions">
+            <div className="export-dropdown-wrap">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setExportOpen((v) => !v)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Xuất dữ liệu
+              </button>
+              {exportOpen && (
+                <div className="export-dropdown">
+                  <button type="button" className="export-item" onClick={handleExportPDF}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                      <polyline points="10 9 9 9 8 9" />
+                    </svg>
+                    Xuất file PDF
                   </button>
-                  <div className="export-menu">
-                    <button type="button" className="btn btn-primary" onClick={() => setExportOpen((v) => !v)}>
-                      ⬇ Xuất dữ liệu
-                    </button>
-                    {exportOpen && (
-                      <div className="export-menu-dropdown">
-                        <button type="button" className="export-menu-item" onClick={handleExportPDF}>
-                          📄 Xuất file PDF
-                        </button>
-                        <button type="button" className="export-menu-item" onClick={handleExportExcel}>
-                          📊 Xuất file Excel (XLSX)
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button type="button" className="export-item" onClick={handleExportExcel}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <line x1="3" y1="9" x2="21" y2="9" />
+                      <line x1="3" y1="15" x2="21" y2="15" />
+                      <line x1="9" y1="3" x2="9" y2="21" />
+                      <line x1="15" y1="3" x2="15" y2="21" />
+                    </svg>
+                    Xuất file Excel (XLSX)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Info Section ── */}
+        <div className="info-section">
+          <div className="info-block">
+            <div className="info-block-header">Thông tin hộ kinh doanh</div>
+            <div className="info-grid-2col">
+              <div className="info-col">
+                <div className="info-row">
+                  <span className="info-row-label">Tên hộ kinh doanh</span>
+                  <span className="info-row-value">Hộ Kinh Doanh Tạp hoá Hải Kiều</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-row-label">Mã số thuế</span>
+                  <span className="info-row-value">051179002157</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-row-label">Địa chỉ</span>
+                  <span className="info-row-value">Thôn 10, Xã Quảng Tín, Tỉnh Lâm Đồng, Việt Nam</span>
+                </div>
+              </div>
+              <div className="info-col">
+                <div className="info-row">
+                  <span className="info-row-label">Trưởng ban kiểm kê</span>
+                  <span className="info-row-value">Phạm Thị Thuý Kiều</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {showDetails && (
-            <div className="inventory-details-wrap" ref={detailsRef}>
-              <div className="overflow-x-auto">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>STT</th>
-                      <th>Nhóm hàng hóa</th>
-                      <th>Đơn vị</th>
-                      <th>Số lượng</th>
-                      <th>Đơn giá bình quân (VND)</th>
-                      <th>Thành tiền (VND)</th>
-                      <th>Ghi chú</th>
+        {/* ── Details Table ── */}
+        {showDetails && (
+          <div className="details-section" ref={detailsRef}>
+            <div className="section-header">
+              <span className="section-title">Kết quả kiểm kê hàng hóa thực tế</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Nhóm hàng hóa</th>
+                    <th>Đơn vị</th>
+                    <th className="text-right">Số lượng</th>
+                    <th className="text-right">Đơn giá bình quân (VND)</th>
+                    <th className="text-right">Thành tiền (VND)</th>
+                    <th>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.map((row, index) => (
+                    <tr key={row.id}>
+                      <td className="text-muted">{index + 1}</td>
+                      <td className="font-medium">{row.name}</td>
+                      <td>
+                        <input
+                          type="text"
+                          value={row.unit ?? ""}
+                          onChange={(e) => handleChange(row.id, "unit", e.target.value)}
+                          className="input-inline"
+                        />
+                      </td>
+                      <td className="text-right">
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          value={row.quantity ?? ""}
+                          onChange={(e) => handleChange(row.id, "quantity", e.target.value)}
+                          className="input-inline input-inline--right"
+                        />
+                      </td>
+                      <td className="text-right">
+                        <VndInput
+                          value={row.unitPrice ?? 0}
+                          onChange={(num) => handleChange(row.id, "unitPrice", num)}
+                          className="input-inline input-inline--right"
+                        />
+                      </td>
+                      <td className="text-right font-medium text-muted">
+                        {formatVnd((row.quantity ?? 0) * (row.unitPrice ?? 0))}
+                      </td>
+                      <td>
+                        <textarea
+                          value={row.note ?? ""}
+                          onChange={(e) => handleChange(row.id, "note", e.target.value)}
+                          className="input-inline input-inline--textarea"
+                          rows={2}
+                          placeholder="VD: Omo, dầu gội..."
+                        />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map((row, index) => (
-                      <tr key={row.id}>
-                        <td>{index + 1}</td>
-                        <td>{row.name}</td>
-                        <td>
-                          <input
-                            type="text"
-                            value={row.unit ?? ""}
-                            onChange={(e) => handleChange(row.id, "unit", e.target.value)}
-                            className="input-base !w-24"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={row.quantity ?? ""}
-                            onChange={(e) => handleChange(row.id, "quantity", e.target.value)}
-                            className="input-base !w-20 text-right"
-                          />
-                        </td>
-                        <td className="number-cell">
-                          <VndInput
-                            value={row.unitPrice ?? 0}
-                            onChange={(num) => handleChange(row.id, "unitPrice", num)}
-                            className="!w-40"
-                          />
-                        </td>
-                        <td className="number-cell">
-                          {formatVnd((row.quantity ?? 0) * (row.unitPrice ?? 0))}
-                        </td>
-                        <td>
-                          <textarea
-                            value={row.note ?? ""}
-                            onChange={(e) => handleChange(row.id, "note", e.target.value)}
-                            className="input-base !min-w-[14rem] !max-w-[18rem] !py-1.5"
-                            rows={2}
-                            placeholder="Liệt kê vài mặt hàng đại diện (VD: Omo, dầu gội...)"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
+        )}
 
-          <div className="mt-6 flex justify-between text-sm inventory-sig">
-            <div>
-              <p>Ngày 31 tháng 12 năm 2025</p>
-            </div>
-            <div className="text-right">
-              <p><strong>ĐẠI DIỆN HỘ KINH DOANH / CÁ NHÂN KINH DOANH</strong></p>
-              <p className="text-ink-muted">(Ký, ghi rõ họ tên)</p>
-              <p className="mt-10"><strong>Phạm Thị Thuý Kiều</strong></p>
+        {/* ── Signature (Print Only) ── */}
+        <div className="signature-section print-only">
+          <div className="signature-row">
+            <div className="signature-date">Ngày 31 tháng 12 năm 2025</div>
+            <div className="signature-block">
+              <div className="signature-title">ĐẠI DIỆN HỘ KINH DOANH / CÁ NHÂN KINH DOANH</div>
+              <div className="signature-note">(Ký, ghi rõ họ tên)</div>
+              <div className="signature-name">Phạm Thị Thuý Kiều</div>
             </div>
           </div>
         </div>
-      )}
-
-      {activeTab === "reset" && (
-        <div className="card">
-          <h2>Khôi phục số liệu</h2>
-          <p className="text-sm text-ink-muted mb-3">
-            Đang dùng số liệu cũ (Lẻ, 200, 2.000.000…)? Bấm nút bên dưới để chuyển sang <strong>bảng mặc định mới</strong> (phù hợp khoảng 250 triệu đồng tồn kho đầu năm).
-          </p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={resetInventoryToDefault}
-          >
-            Khôi phục số liệu mặc định theo biên bản kiểm kê
-          </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
