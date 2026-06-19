@@ -319,7 +319,46 @@ gia_ban_le_goi_y = gia_nhap_sau_vat * 1.15
 
 ---
 
-## 8. Lộ trình phát triển
+## 8. TYPOGRAPHY & NAVIGATION DESIGN SYSTEM
+
+### 8.1 Hệ thống Tiêu đề các Trang con (Sub-pages Header)
+
+Mọi trang con (Danh sách phiếu, Thêm phiếu, Thêm doanh thu tháng, Khóa sổ) **bắt buộc** áp dụng cấu trúc Header sau:
+
+| Thành phần | Quy chuẩn |
+|------------|-----------|
+| **Tiêu đề chính (Title)** | `text-xl font-bold text-gray-800` (1.25rem / 20px, font-weight 700) |
+| **Nút Quay lại** | Icon `ChevronLeft` (size=18), text "Quay lại" (`text-sm text-gray-500 font-medium`) |
+
+### 8.2 Cấu trúc Layout Header chuẩn
+
+```jsx
+<div className="bg-white border-b border-gray-100 px-4 py-3">
+  <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-medium mb-2">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+    <span>Quay lại</span>
+  </button>
+  <h1 className="text-xl font-bold text-gray-800">TÊN TIÊU ĐỀ TRANG</h1>
+  <p className="text-xs text-gray-400 mt-0.5">Mô tả ngắn</p>
+</div>
+```
+
+### 8.3 CSS Sub-page Header (index.css)
+
+```css
+.sub-page-title h2 {
+  font-size: 1.25rem;   /* = text-xl */
+  font-weight: 700;    /* = font-bold */
+  color: #1F2937;       /* = text-gray-800 */
+  margin: 0 0 4px;
+}
+```
+
+---
+
+## 9. Lộ trình phát triển
 
 | Giai đoạn | Nội dung | Trạng thái |
 |-----------|----------|------------|

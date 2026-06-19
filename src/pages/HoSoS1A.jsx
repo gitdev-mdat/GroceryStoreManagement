@@ -1,372 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { formatVnd } from '../components/FormatNumber'
-import { formatDateDisplay } from '../components/FormatDate'
-import SoS1aHKD from '../components/SoS1aHKD'
 
 // ─────────────────────────────────────────
-// Sub-pages (lazy import patterns)
+// External Components
 // ─────────────────────────────────────────
-function ListPage({ onBack }) {
-  const [loading, setLoading] = useState(false)
-  const [allTickets, setAllTickets] = useState([])
-  const [filterMonth, setFilterMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
-  const [availableMonths, setAvailableMonths] = useState([])
+import S1AList from '../components/s1a/S1AList'
+import AddTicketForm from '../components/s1a/AddTicketForm'
+import AddMonthlyRevenueForm from '../components/s1a/AddMonthlyRevenueForm'
+import SoS1aHKD from '../components/s1a/SoS1aHKD'
 
-  const fetchAvailableMonths = useCallback(async () => {
-    if (!isSupabaseConfigured()) { setAvailableMonths([]); return }
-    try {
-      const { data } = await supabase.from('sales_tickets').select('sale_date')
-      if (!data || data.length === 0) {
-        const now = new Date()
-        setAvailableMonths([`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`])
-        return
-      }
-      const monthSet = new Set()
-      data.forEach(item => {
-        if (item.sale_date) {
-          const d = new Date(item.sale_date)
-          monthSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-        }
-      })
-      setAvailableMonths(Array.from(monthSet).sort((a, b) => b.localeCompare(a)))
-    } catch {
-      const now = new Date()
-      setAvailableMonths([`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`])
-    }
-  }, [])
-
-  const fetchData = useCallback(async () => {
-    if (!isSupabaseConfigured()) { setLoading(false); return }
-    setLoading(true)
-    try {
-      const { data } = await supabase.from('sales_tickets').select('*').order('sale_date', { ascending: false })
-      setAllTickets(data || [])
-    } catch { setAllTickets([]) }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { fetchAvailableMonths(); fetchData() }, [fetchAvailableMonths, fetchData])
-
-  useEffect(() => {
-    if (availableMonths.length > 0 && !availableMonths.includes(filterMonth)) {
-      setFilterMonth(availableMonths[0])
-    }
-  }, [availableMonths, filterMonth])
-
-  const monthRows = allTickets.filter(ticket => {
-    if (!ticket.sale_date) return false
-    const [y, m] = filterMonth.split('-')
-    return ticket.sale_date.slice(0, 4) === y && ticket.sale_date.slice(5, 7) === m
-  }).sort((a, b) => (b.sale_date || '').localeCompare(a.sale_date || ''))
-
-  const totalTickets = monthRows.length
-  const totalAmount = monthRows.reduce((sum, t) => sum + (Number(t.total_amount) || 0), 0)
-
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Danh sách phiếu</h2>
-          <p className="sub-page-subtitle">Xem và quản lý các phiếu doanh thu</p>
-        </div>
-      </div>
-
-      <div className="sub-page-content">
-        {/* Stats Row */}
-        <div className="mini-stats-row">
-          <div className="mini-stat">
-            <span className="mini-stat-value">{totalTickets}</span>
-            <span className="mini-stat-label">Phiếu phát sinh</span>
-          </div>
-          <div className="mini-stat">
-            <span className="mini-stat-value text-emerald">{formatVnd(totalAmount)}</span>
-            <span className="mini-stat-label">Tổng doanh thu</span>
-          </div>
-        </div>
-
-        {/* Filter */}
-        <div className="filter-bar">
-          <select
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            className="filter-select"
-          >
-            {availableMonths.map(m => {
-              const [y, mo] = m.split('-')
-              return <option key={m} value={m}>Tháng {mo}/{y}</option>
-            })}
-          </select>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Ngày tháng</th>
-                <th>Số phiếu</th>
-                <th>Diễn giải</th>
-                <th className="text-right">Số tiền (VND)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center py-8 text-muted">Đang tải...</td></tr>
-              ) : monthRows.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-8 text-muted">Không có dữ liệu trong kỳ này.</td></tr>
-              ) : monthRows.map(ticket => (
-                <tr key={ticket.id}>
-                  <td>{formatDateDisplay(ticket.sale_date)}</td>
-                  <td className="font-medium">{ticket.ticket_number || '—'}</td>
-                  <td className="text-muted italic">{ticket.notes || '—'}</td>
-                  <td className="text-right font-medium text-emerald">{formatVnd(ticket.total_amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-            {!loading && monthRows.length > 0 && (
-              <tfoot>
-                <tr className="table-footer-row">
-                  <td colSpan={2}>Tổng cộng {totalTickets} phiếu</td>
-                  <td>Tổng</td>
-                  <td className="text-right text-emerald font-bold">{formatVnd(totalAmount)} VND</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AddPage({ onBack }) {
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Thêm phiếu</h2>
-          <p className="sub-page-subtitle">Nhập doanh thu cho một ngày cụ thể</p>
-        </div>
-      </div>
-      <div className="sub-page-content">
-        <AddTicketFormInner onBack={onBack} />
-      </div>
-    </div>
-  )
-}
-
-function AddTicketFormInner({ onBack }) {
-  const [date, setDate] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  })
-  const [amount, setAmount] = useState(0)
-  const [notes, setNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState(null)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!date || amount <= 0) return
-    setSubmitting(true)
-    try {
-      if (!isSupabaseConfigured()) throw new Error('Chưa kết nối Supabase')
-      const ticketNumber = `S1A-${Date.now().toString(36).toUpperCase()}`
-      const { error } = await supabase.from('sales_tickets').insert([{
-        ticket_number: ticketNumber,
-        sale_date: date,
-        total_amount: Number(amount),
-        notes: notes || 'Bán lẻ cho khách hàng cá nhân',
-      }])
-      if (error) throw error
-      setAmount(0)
-      setNotes('')
-      setMsg({ type: 'success', text: `Đã thêm phiếu ${formatVnd(amount)} VND.` })
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message || 'Không thể thêm phiếu.' })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="form-card">
-      <p className="form-hint">Nhập doanh thu cho <strong>một ngày cụ thể</strong>.</p>
-      <form onSubmit={handleSubmit} className="form-stack">
-        <div className="form-row">
-          <div className="form-group">
-            <label>Ngày</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input-base" required />
-          </div>
-          <div className="form-group">
-            <label>Số tiền (VND)</label>
-            <input
-              type="number"
-              value={amount || ''}
-              onChange={e => setAmount(Number(e.target.value) || 0)}
-              placeholder="7.000.000"
-              className="input-base"
-              required
-            />
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Diễn giải</label>
-          <input
-            type="text"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Nhập diễn giải..."
-            className="input-base"
-          />
-        </div>
-        {msg && (
-          <div className={`msg-box ${msg.type === 'success' ? 'msg-success' : 'msg-error'}`}>
-            {msg.text}
-          </div>
-        )}
-        <div className="form-actions">
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Đang lưu...' : 'Thêm phiếu'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-function BatchAddPage({ onBack }) {
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Thêm doanh thu tháng</h2>
-          <p className="sub-page-subtitle">Nhập nhanh tổng doanh thu cả tháng</p>
-        </div>
-      </div>
-      <div className="sub-page-content">
-        <BatchFormInner onBack={onBack} />
-      </div>
-    </div>
-  )
-}
-
-function BatchFormInner({ onBack }) {
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
-  const [amount, setAmount] = useState(0)
-  const [notes, setNotes] = useState('Nhập nhanh doanh thu tổng cả tháng')
-  const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState(null)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (amount <= 0) return
-    setSubmitting(true)
-    try {
-      if (!isSupabaseConfigured()) throw new Error('Chưa kết nối Supabase')
-      const ticketNumber = `S1A-${Date.now().toString(36).toUpperCase()}`
-      const saleDate = `${year}-${String(month).padStart(2, '0')}-01`
-      const { error } = await supabase.from('sales_tickets').insert([{
-        ticket_number: ticketNumber,
-        sale_date: saleDate,
-        total_amount: Number(amount),
-        notes,
-      }])
-      if (error) throw error
-      setAmount(0)
-      setMsg({ type: 'success', text: `Đã thêm doanh thu tháng ${month}/${year}: ${formatVnd(amount)} VND.` })
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message || 'Không thể lưu.' })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="form-card">
-      <p className="form-hint">Nhập nhanh tổng doanh thu bán ra cho cả tháng. Hệ thống sẽ ghi vào ngày mùng 1.</p>
-      <form onSubmit={handleSubmit} className="form-stack">
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tháng</label>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input-base">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                <option key={m} value={m}>Tháng {m}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Năm</label>
-            <input
-              type="number"
-              value={year}
-              onChange={e => setYear(Number(e.target.value) || now.getFullYear())}
-              min={2020}
-              max={2030}
-              className="input-base"
-            />
-          </div>
-          <div className="form-group flex-fill">
-            <label>Số tiền (VND)</label>
-            <input
-              type="number"
-              value={amount || ''}
-              onChange={e => setAmount(Number(e.target.value) || 0)}
-              placeholder="7.000.000"
-              className="input-base"
-              required
-            />
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Diễn giải</label>
-          <input
-            type="text"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Nhập diễn giải..."
-            className="input-base"
-          />
-        </div>
-        {msg && (
-          <div className={`msg-box ${msg.type === 'success' ? 'msg-success' : 'msg-error'}`}>
-            {msg.text}
-          </div>
-        )}
-        <div className="form-actions">
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Đang lưu...' : 'Thêm doanh thu'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
+// ─────────────────────────────────────────
+// Sub-page Wrappers (lightweight shells)
+// ─────────────────────────────────────────
 function LedgerPage({ onBack }) {
   return (
     <div className="sub-page">
@@ -393,28 +39,6 @@ function LedgerPage({ onBack }) {
 }
 
 function CloseBookPage({ onBack }) {
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Chốt sổ S1A</h2>
-          <p className="sub-page-subtitle">Khoá số liệu kỳ kê khai</p>
-        </div>
-      </div>
-      <div className="sub-page-content">
-        <CloseBookFormInner onBack={onBack} />
-      </div>
-    </div>
-  )
-}
-
-function CloseBookFormInner({ onBack }) {
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
   const [submitting, setSubmitting] = useState(false)
@@ -422,7 +46,6 @@ function CloseBookFormInner({ onBack }) {
   const [closedPeriods, setClosedPeriods] = useState([])
 
   useEffect(() => {
-    // Load closed periods from localStorage or context
     const stored = localStorage.getItem('closed_periods')
     if (stored) setClosedPeriods(JSON.parse(stored))
   }, [])
@@ -450,52 +73,68 @@ function CloseBookFormInner({ onBack }) {
   }
 
   return (
-    <div className="form-card">
-      <p className="form-hint">Sau khi chốt sổ, phiếu trong kỳ không thể chỉnh sửa hoặc xóa.</p>
-      <div className="form-stack">
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tháng</label>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input-base">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                <option key={m} value={m}>Tháng {m}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Năm</label>
-            <input
-              type="number"
-              value={year}
-              onChange={e => setYear(Number(e.target.value) || new Date().getFullYear())}
-              min={2020}
-              max={2030}
-              className="input-base"
-            />
-          </div>
-          <div className="form-actions-self">
-            <button type="button" className="btn btn-primary" onClick={handleCloseBook} disabled={submitting}>
-              {submitting ? 'Đang chốt...' : 'Chốt sổ tháng này'}
-            </button>
-          </div>
+    <div className="sub-page">
+      <div className="sub-page-header">
+        <button type="button" className="back-btn" onClick={onBack}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Quay lại Hub
+        </button>
+        <div className="sub-page-title">
+          <h2>Chốt sổ S1A</h2>
+          <p className="sub-page-subtitle">Khoá số liệu kỳ kê khai</p>
         </div>
-        {msg && (
-          <div className={`msg-box ${msg.type === 'success' ? 'msg-success' : 'msg-error'}`}>
-            {msg.text}
+      </div>
+      <div className="sub-page-content">
+        <div className="form-card">
+          <p className="form-hint">Sau khi chốt sổ, phiếu trong kỳ không thể chỉnh sửa hoặc xóa.</p>
+          <div className="form-stack">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Tháng</label>
+                <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input-base">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>Tháng {m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Năm</label>
+                <input
+                  type="number"
+                  value={year}
+                  onChange={e => setYear(Number(e.target.value) || new Date().getFullYear())}
+                  min={2020}
+                  max={2030}
+                  className="input-base"
+                />
+              </div>
+              <div className="form-actions-self">
+                <button type="button" className="btn btn-primary" onClick={handleCloseBook} disabled={submitting}>
+                  {submitting ? 'Đang chốt...' : 'Chốt sổ tháng này'}
+                </button>
+              </div>
+            </div>
+            {msg && (
+              <div className={`msg-box ${msg.type === 'success' ? 'msg-success' : 'msg-error'}`}>
+                {msg.text}
+              </div>
+            )}
+            <div className="closed-list">
+              <strong className="text-sm font-semibold">Các kỳ đã chốt:</strong>
+              {closedPeriods.length === 0 ? (
+                <p className="text-sm text-muted mt-1">Chưa chốt kỳ nào.</p>
+              ) : (
+                <ul className="mt-1">
+                  {closedPeriods.map(ym => {
+                    const [y, m] = ym.split('-')
+                    return <li key={ym} className="text-sm">Tháng {Number(m)}/{y}</li>
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
-        )}
-        <div className="closed-list">
-          <strong className="text-sm font-semibold">Các kỳ đã chốt:</strong>
-          {closedPeriods.length === 0 ? (
-            <p className="text-sm text-muted mt-1">Chưa chốt kỳ nào.</p>
-          ) : (
-            <ul className="mt-1">
-              {closedPeriods.map(ym => {
-                const [y, m] = ym.split('-')
-                return <li key={ym} className="text-sm">Tháng {Number(m)}/{y}</li>
-              })}
-            </ul>
-          )}
         </div>
       </div>
     </div>
@@ -653,10 +292,10 @@ export default function HoSoS1A() {
         </>
       )}
 
-      {/* Sub-pages */}
-      {view === 'list' && <ListPage onBack={handleBack} />}
-      {view === 'add' && <AddPage onBack={handleBack} />}
-      {view === 'batchAdd' && <BatchAddPage onBack={handleBack} />}
+      {/* Sub-pages - using external components */}
+      {view === 'list' && <S1AList onBack={handleBack} />}
+      {view === 'add' && <AddTicketForm onBack={handleBack} />}
+      {view === 'batchAdd' && <AddMonthlyRevenueForm onBack={handleBack} />}
       {view === 'ledger' && <LedgerPage onBack={handleBack} />}
       {view === 'closeBook' && <CloseBookPage onBack={handleBack} />}
     </div>

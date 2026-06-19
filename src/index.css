@@ -1587,6 +1587,7 @@
    SUB-PAGE LAYOUT
    ========================================================================== */
 .sub-page {
+  padding: 0 16px;
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn {
@@ -1618,9 +1619,9 @@
   color: #1E293B;
 }
 .sub-page-title h2 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: #0F172A;
+  color: #1F2937;
   margin: 0 0 4px;
 }
 .sub-page-subtitle {
@@ -1636,8 +1637,9 @@
 /* Mini Stats Row (in sub-page) */
 .mini-stats-row {
   display: flex;
-  gap: 16px;
+  gap: 40px;
   margin-bottom: 20px;
+  padding-left: 0;
 }
 .mini-stat {
   display: flex;
@@ -1661,6 +1663,7 @@
 /* Filter Bar */
 .filter-bar {
   margin-bottom: 16px;
+  padding-left: 0;
 }
 .filter-select {
   padding: 10px 14px;
@@ -1882,4 +1885,32 @@
     font-weight: 700;
     color: #333;
   }
+}
+
+/* Bottom Sheet Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }

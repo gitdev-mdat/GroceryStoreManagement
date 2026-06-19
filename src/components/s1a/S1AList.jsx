@@ -4,24 +4,24 @@ import { formatVnd } from '../FormatNumber'
 import { formatDateDisplay } from '../FormatDate'
 
 // Skeleton Component
-function MobileCardSkeleton() {
+function CardSkeleton() {
   return (
     <>
       {[1, 2, 3].map((i) => (
-        <div key={i} className="py-4 border-b border-gray-100">
+        <div key={i} className="p-4 bg-white border border-gray-100 rounded-xl">
           <div className="flex justify-between items-center">
+            <div className="h-5 w-28 rounded bg-slate-200 animate-pulse" />
             <div className="h-5 w-24 rounded bg-slate-200 animate-pulse" />
-            <div className="h-5 w-20 rounded bg-slate-200 animate-pulse" />
           </div>
-          <div className="h-3 w-32 rounded bg-slate-200 animate-pulse mt-2" />
-          <div className="h-3 w-48 rounded bg-slate-200 animate-pulse mt-1" />
+          <div className="h-3 w-40 rounded bg-slate-200 animate-pulse mt-2" />
+          <div className="h-4 w-full rounded bg-slate-200 animate-pulse mt-3 pt-2 border-t border-gray-50" />
         </div>
       ))}
     </>
   )
 }
 
-export default function S1AList({ onNotify, onRefresh }) {
+export default function S1AList({ onBack, onNotify, onRefresh }) {
   const [loading, setLoading] = useState(false)
   const [allTickets, setAllTickets] = useState([])
   const [filterMonth, setFilterMonth] = useState(() => {
@@ -29,6 +29,8 @@ export default function S1AList({ onNotify, onRefresh }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   const [availableMonths, setAvailableMonths] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10
 
   // Fetch distinct months from sales_tickets
   const fetchAvailableMonths = useCallback(async () => {
@@ -137,104 +139,139 @@ export default function S1AList({ onNotify, onRefresh }) {
   const totalTickets = monthRows.length
   const totalAmount = monthRows.reduce((sum, ticket) => sum + (Number(ticket.total_amount) || 0), 0)
 
+  // Paginated rows
+  const totalPages = Math.max(1, Math.ceil(totalTickets / pageSize))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedRows = monthRows.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  // Reset to page 1 when filter changes
+  useEffect(() => { setCurrentPage(1) }, [filterMonth])
+
   return (
-    <div className="card">
-      {/* Summary Badges */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div />
-        <div className="flex gap-3 text-sm">
-          <span className="s1a-stat-badge">
-            <span className="s1a-stat-num">{totalTickets}</span> phieu phat sinh
-          </span>
-          <span className="s1a-stat-badge">
-            <span className="s1a-stat-num">{formatVnd(totalAmount)}</span> VND
-          </span>
+    <div className="sub-page">
+      {/* Header */}
+      <div className="sub-page-header">
+        <button type="button" className="back-btn" onClick={onBack}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Quay lại
+        </button>
+        <div className="sub-page-title">
+          <h2 className="text-xl font-bold text-gray-800">Danh sách phiếu</h2>
+          <p className="sub-page-subtitle">Xem và quản lý các phiếu doanh thu</p>
         </div>
       </div>
 
-      {/* Filter: Month/Year Dropdown */}
-      <div className="my-3">
-        <select
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-        >
-          {availableMonths.map((month) => {
-            const [y, m] = month.split('-')
-            const label = `Tháng ${m}/${y}`
-            return (
-              <option key={month} value={month}>
-                {label}
-              </option>
-            )
-          })}
-        </select>
-      </div>
-
-      {/* ========================== */}
-      {/* CARD LIST VIEW - Always visible */}
-      {/* ========================== */}
-
-      {/* Loading State */}
-      {loading && <MobileCardSkeleton />}
-
-      {/* Empty State */}
-      {!loading && monthRows.length === 0 && (
-        <div className="text-center text-slate-400 py-8 text-sm">
-          {isSupabaseConfigured() ? 'Không có dữ liệu trong kỳ này.' : 'Chưa kết nối Supabase.'}
+      {/* Content */}
+      <div className="sub-page-content bg-slate-50">
+        {/* Stats Row */}
+        <div className="mini-stats-row">
+          <div className="mini-stat">
+            <span className="mini-stat-value">{totalTickets}</span>
+            <span className="mini-stat-label">Phiếu phát sinh</span>
+          </div>
+          <div className="mini-stat">
+            <span className="mini-stat-value text-emerald">{formatVnd(totalAmount)}</span>
+            <span className="mini-stat-label">Tổng doanh thu</span>
+          </div>
         </div>
-      )}
 
-      {/* Card List */}
-      {!loading && monthRows.length > 0 && (
-        <>
-          {monthRows.map((ticket) => (
-            <div
-              key={ticket.id}
-              className="py-4 border-b border-gray-100 last:border-b-0"
-            >
-              {/* Row 1: Date | Amount */}
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-900">
-                  {formatDateDisplay(ticket.sale_date)}
-                </span>
-                <span className="font-bold text-green-600 tabular-nums whitespace-nowrap pl-4">
-                  {formatVnd(ticket.total_amount)}
-                </span>
-              </div>
-              {/* Row 2: Ticket ID */}
-              <div className="mt-1">
-                <span className="text-xs text-gray-400">
-                  Mã phiếu: {ticket.ticket_number || '—'}
-                </span>
-              </div>
-              {/* Row 3: Notes */}
-              <div className="mt-0.5">
-                <span className="text-xs text-gray-600 leading-relaxed break-words">
-                  {ticket.notes || '—'}
-                </span>
-              </div>
-            </div>
-          ))}
+        {/* Filter */}
+        <div className="filter-bar">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="filter-select"
+          >
+            {availableMonths.map((month) => {
+              const [y, m] = month.split('-')
+              return (
+                <option key={month} value={month}>
+                  Tháng {m}/{y}
+                </option>
+              )
+            })}
+          </select>
+        </div>
 
-          {/* Summary Card */}
-          <div className="my-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-sm text-emerald-800 font-semibold">
-                  Tổng cộng {totalTickets} phiếu
-                </span>
-                <span className="block text-xs text-emerald-600 mt-0.5">
-                  Tháng {filterMonth}
-                </span>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col gap-3">
+            <CardSkeleton />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && monthRows.length === 0 && (
+          <div className="text-center text-slate-400 py-8 text-sm">
+            {isSupabaseConfigured() ? 'Không có dữ liệu trong kỳ này.' : 'Chưa kết nối Supabase.'}
+          </div>
+        )}
+
+        {/* Card List */}
+        {!loading && monthRows.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {/* Ticket Cards */}
+            {paginatedRows.map((ticket) => (
+              <div key={ticket.id} className="p-4 bg-white border border-gray-100 rounded-xl">
+                {/* Top: Date | Amount */}
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-gray-800">
+                    {formatDateDisplay(ticket.sale_date)}
+                  </span>
+                  <span className="font-semibold text-green-600 tabular-nums whitespace-nowrap">
+                    {formatVnd(ticket.total_amount)}
+                  </span>
+                </div>
+
+                {/* Middle: Ticket ID */}
+                <div className="mt-1">
+                  <span className="text-xs text-gray-400">
+                    Mã phiếu: {ticket.ticket_number || '—'}
+                  </span>
+                </div>
+
+                {/* Bottom: Notes */}
+                <div className="mt-3 pt-2 border-t border-gray-50">
+                  <span className="text-sm text-gray-600 leading-relaxed break-words block">
+                    {ticket.notes || '—'}
+                  </span>
+                </div>
               </div>
-              <span className="text-lg font-bold text-emerald-700 tabular-nums whitespace-nowrap">
-                {formatVnd(totalAmount)}
+            ))}
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between py-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="bg-white border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 hover:border-gray-300 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Trước
+              </button>
+              <span className="text-xs text-gray-500 font-medium tabular-nums">
+                Trang {safePage} / {totalPages}
               </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className="bg-white border border-gray-200 rounded-lg py-1.5 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 hover:border-gray-300 transition-colors"
+              >
+                Sau
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
             </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   )
 }
