@@ -9,6 +9,7 @@ import BangKeMuaVao from './pages/BangKeMuaVao'
 import NhatKyHoaDon from './pages/NhatKyHoaDon'
 import TraCuuGia from './pages/TraCuuGia'
 import TongHopThang from './pages/TongHopThang'
+import LoginPage from './pages/LoginPage'
 
 const NAV_GROUPS = [
   {
@@ -160,6 +161,7 @@ export default function App() {
               <Route path="/bao-cao" element={<BaoCao />} />
               <Route path="/tra-cuu-gia" element={<TraCuuGia />} />
               <Route path="/tong-hop-thang" element={<TongHopThang />} />
+              <Route path="/login" element={<LoginPage />} />
             </Routes>
           </div>
         </div>

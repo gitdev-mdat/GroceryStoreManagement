@@ -1109,383 +1109,489 @@ Return valid JSON only.`
   }
 
   return (
-    <div>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-brand-700 m-0">Nhập hóa đơn</h1>
-        <p className="text-sm text-ink-muted mt-1 mb-0">
-          Tải ảnh hóa đơn để Gemini OCR tự động điền form và bóc tách mặt hàng.
-        </p>
-      </div>
+    <div className="flex flex-col h-full">
 
-      {/* Invoice Type Selector - Full Width */}
-      <div className="card mb-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm font-medium text-slate-600">Loại hóa đơn:</span>
-          <div className="flex rounded-lg border border-slate-300 overflow-hidden">
+      {/* ── PAGE HEADER ── */}
+      <div className="flex flex-col gap-3 mb-4 flex-shrink-0 lg:flex-row lg:items-center lg:justify-between">
+        <h1 className="text-xl font-bold text-brand-700 m-0 lg:text-2xl">Nhập hóa đơn</h1>
+
+        {/* Tab Switcher — Invoice Type */}
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:block text-sm font-medium text-slate-500">Loại hóa đơn:</span>
+          <div className="flex rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50">
             <button
               type="button"
+              id="tab-vat"
               onClick={() => setInvoiceType('VAT')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 invoiceType === 'VAT'
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#1e3a5f] text-white shadow-inner'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
             >
               📄 Hóa đơn VAT
             </button>
             <button
               type="button"
+              id="tab-retail"
               onClick={() => setInvoiceType('RETAIL')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 invoiceType === 'RETAIL'
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#1e3a5f] text-white shadow-inner'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
             >
-              🛒 Hóa đơn bán lẻ
+              🛒 Bán lẻ
             </button>
           </div>
         </div>
       </div>
 
-      {/* Dropzone - Prominent Position */}
-      <div className="card mb-4">
-        <div
-          className={`relative w-full rounded-xl border-2 border-dashed bg-slate-50 px-6 py-8 text-center transition-all ${
-            isLoadingOCR
-              ? 'border-brand-400 bg-brand-50/50 animate-pulse'
-              : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/40 cursor-pointer'
-          }`}
-          onClick={isLoadingOCR ? undefined : () => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              if (!isLoadingOCR) fileInputRef.current?.click()
-            }
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+      {/* ── SPLIT-SCREEN MAIN CONTENT ── */}
+      <div className="flex flex-col gap-4 flex-1 min-h-0 lg:flex-row lg:gap-5">
 
-          {isLoadingOCR ? (
-            <div className="flex flex-col items-center justify-center gap-3">
-              <div className="h-10 w-10 rounded-full border-3 border-brand-200 border-t-brand-600 animate-spin" />
-              <p className="text-base font-medium text-brand-700">
-                🤖 Gemini đang quét và phân tích hóa đơn...
-              </p>
-              <p className="text-sm text-slate-500">Vui lòng đợi trong giây lát</p>
-            </div>
-          ) : imageFile ? (
-            <div className="flex flex-col items-center gap-3">
-              <img
-                src={imagePreview}
-                alt="Xem trước hóa đơn"
-                className="max-h-40 rounded-lg object-contain shadow-md"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-ghost !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setViewerImage(imagePreview)
-                  }}
-                >
-                  🖼️ Xem ảnh đầy đủ
-                </button>
-                <button
-                  type="button"
-                  className="btn !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setImageFile(null)
-                    setImagePreview(null)
-                    setOcrItems([])
-                    setEditableItems([])
-                    if (fileInputRef.current) fileInputRef.current.value = ''
-                  }}
-                >
-                  ✕ Bỏ ảnh
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const file = fileInputRef.current?.files?.[0]
-                    if (file) handleInvoiceUpload(file)
-                  }}
-                >
-                  🔄 Quét lại
-                </button>
+        {/* ══ LEFT COLUMN — Upload & Preview (40% on desktop, full on mobile) ══ */}
+        <div className="flex flex-col gap-3 lg:w-[40%] lg:flex-shrink-0">
+
+          {/* Upload / Preview Zone */}
+          <div
+            id="invoice-dropzone"
+            className={`relative rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center transition-all duration-200 cursor-pointer overflow-hidden
+              h-[200px] lg:h-auto lg:flex-1 lg:min-h-[340px] ${
+              isLoadingOCR
+                ? 'border-blue-300 bg-blue-50/60 animate-pulse cursor-default'
+                : imageFile
+                ? 'border-slate-200 bg-slate-50 hover:border-blue-300'
+                : 'border-slate-300 bg-slate-50 hover:border-[#1e3a5f] hover:bg-blue-50/30'
+            }`}
+            onClick={isLoadingOCR ? undefined : () => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                if (!isLoadingOCR) fileInputRef.current?.click()
+              }
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {isLoadingOCR ? (
+              <div className="flex flex-col items-center gap-3 px-6">
+                <div className="h-12 w-12 rounded-full border-4 border-blue-100 border-t-[#1e3a5f] animate-spin" />
+                <p className="text-sm font-semibold text-[#1e3a5f]">🤖 Gemini đang phân tích...</p>
+                <p className="text-xs text-slate-400">{ocrMessage || 'Vui lòng đợi trong giây lát'}</p>
               </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-4xl leading-none">📤</span>
-              <p className="text-base font-medium text-slate-600">
-                Kéo thả ảnh hóa đơn vào đây
-              </p>
-              <p className="text-sm text-slate-500">hoặc nhấp để chọn file</p>
-              <span className="text-xs text-slate-400 mt-1">Hỗ trợ JPG, PNG, PDF</span>
+            ) : imageFile ? (
+              <div className="flex flex-col items-center gap-3 w-full h-full p-3">
+                <img
+                  src={imagePreview}
+                  alt="Xem trước hóa đơn"
+                  className="flex-1 w-full rounded-xl object-contain shadow-md"
+                  style={{ maxHeight: 'calc(100% - 80px)' }}
+                />
+                <div className="flex flex-wrap items-center gap-2 justify-center flex-shrink-0">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+                    onClick={(e) => { e.stopPropagation(); setViewerImage(imagePreview) }}
+                  >
+                    🖼️ Xem đầy đủ
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setImageFile(null); setImagePreview(null)
+                      setOcrItems([]); setEditableItems([])
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                  >
+                    ✕ Bỏ ảnh
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e3a5f] text-white hover:bg-[#16304f] transition-colors shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const file = fileInputRef.current?.files?.[0]
+                      if (file) handleInvoiceUpload(file)
+                    }}
+                  >
+                    🔄 Quét lại
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-8">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-3xl shadow-inner">
+                  📤
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Kéo thả ảnh hóa đơn vào đây</p>
+                  <p className="text-xs text-slate-400 mt-1">hoặc nhấp để chọn file</p>
+                </div>
+                <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">JPG · PNG · PDF</span>
+              </div>
+            )}
+          </div>
+
+          {/* OCR Status / Error banners inside left column */}
+          {ocrMessage && !isLoadingOCR && (
+            <div className={`px-4 py-3 rounded-xl text-xs font-medium flex-shrink-0 ${
+              ocrMessage.includes('thành công') || ocrMessage.includes('xong')
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              {ocrMessage}
             </div>
           )}
+          {retryableError && !isLoadingOCR && (() => {
+            const errStatus = retryableError?.status || retryableError?.code
+            const errMsg = String(retryableError?.message || '')
+            const isOverload = errStatus === 503 || errStatus === 429 || /high demand|UNAVAILABLE|overloaded|busy|quá tải/i.test(errMsg)
+            const displayCode = isOverload ? `${errStatus || '503'} / Hệ thống bận` : errStatus ? `Mã lỗi: ${errStatus}` : 'Lỗi không xác định'
+            return (
+              <div className="p-3 rounded-xl bg-red-50 text-red-800 border border-red-200 flex-shrink-0">
+                <p className="text-xs font-semibold mb-1">⚠️ Lỗi quét ({displayCode})</p>
+                <p className="text-xs text-red-600 mb-2">Máy chủ Gemini tạm bận. Bấm Thử lại.</p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-lg bg-[#1e3a5f] hover:bg-[#16304f] text-white px-3 py-1.5 text-xs font-semibold transition-colors"
+                  onClick={() => { const file = fileInputRef.current?.files?.[0]; if (file) handleInvoiceUpload(file) }}
+                >
+                  🔄 Thử lại
+                </button>
+              </div>
+            )
+          })()}
         </div>
 
-        {/* OCR Status Messages */}
-        {ocrMessage && !isLoadingOCR && (
-          <div className={`mt-3 p-3 rounded-lg text-sm ${
-            ocrMessage.includes('thành công') || ocrMessage.includes('xong')
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-brand-50 text-brand-700 border border-brand-200'
-          }`}>
-            {ocrMessage}
-          </div>
-        )}
-        {retryableError && !isLoadingOCR && (() => {
-          const errStatus = retryableError?.status || retryableError?.code
-          const errMsg = String(retryableError?.message || '')
-          const isOverload = errStatus === 503 || errStatus === 429 || /high demand|UNAVAILABLE|overloaded|busy|quá tải/i.test(errMsg)
-          const displayCode = isOverload
-            ? `${errStatus || '503'} / Hệ thống bận`
-            : errStatus ? `Mã lỗi: ${errStatus}` : 'Lỗi không xác định'
-          return (
-            <div className="mt-3 p-4 rounded-lg bg-red-50 text-red-800 border border-red-200 shadow-sm">
-              <p className="text-sm font-semibold mb-1">⚠️ Đã xảy ra lỗi khi quét hóa đơn ({displayCode})</p>
-              <p className="text-xs text-red-600 mb-3">
-                Chi tiết: Máy chủ Gemini đang quá tải tạm thời. Vui lòng bấm nút Thử lại phía dưới.
-              </p>
+        {/* ══ RIGHT COLUMN — Form Card (60% on desktop, full on mobile) ══ */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col flex-1 overflow-hidden">
+
+            {/* Card Header */}
+            <div className="px-5 py-3.5 border-b border-slate-100 flex-shrink-0 lg:px-6 lg:py-4">
+              <h2 className="text-base font-bold text-slate-800 m-0">
+                {invoiceType === 'VAT' ? 'Thông tin hóa đơn VAT' : 'Thông tin hóa đơn bán lẻ'}
+              </h2>
+              {isLoadingOCR && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="h-3 w-3 rounded-full bg-blue-400 animate-ping" />
+                  <span className="text-xs font-medium text-blue-600">Đang điền dữ liệu tự động...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Form Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 lg:px-6 lg:py-5">
+              <form id="vat-form" onSubmit={handleSaveAll}>
+
+                {/* ─── VAT FORM ─── */}
+                {invoiceType === 'VAT' && (
+                  <div className="flex flex-col gap-4">
+
+                    {/* Row 1: Tên NCC — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Tên nhà cung cấp / Công ty
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <input
+                            type="text"
+                            value={congTyName}
+                            onChange={(e) => {
+                              setCongTyName(e.target.value)
+                              if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyName; return n })
+                            }}
+                            placeholder="Nhập tên công ty..."
+                            ref={congTyNameRef}
+                            className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.congTyName ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                          />
+                        )
+                      }
+                    </div>
+
+                    {/* Row 2: MST | Ngày xuất VAT */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Mã số thuế đối tác
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : (
+                            <input
+                              type="text"
+                              value={congTyMst}
+                              onChange={(e) => {
+                                setCongTyMst(e.target.value)
+                                if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyMst; return n })
+                              }}
+                              placeholder="VD: 0123456789"
+                              ref={congTyMstRef}
+                              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.congTyMst ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            />
+                          )
+                        }
+                      </div>
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Ngày xuất VAT <span className="text-red-500 normal-case font-bold">*</span>
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Row 3: Ký hiệu | Số HĐ */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Ký hiệu hóa đơn
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : (
+                            <input
+                              type="text"
+                              value={invoiceSymbol}
+                              onChange={(e) => {
+                                setInvoiceSymbol(e.target.value)
+                                if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceSymbol; return n })
+                              }}
+                              placeholder="VD: AA/23"
+                              ref={invoiceSymbolRef}
+                              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.invoiceSymbol ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            />
+                          )
+                        }
+                      </div>
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Số hóa đơn
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : (
+                            <input
+                              type="text"
+                              value={invoiceNumber}
+                              onChange={(e) => {
+                                setInvoiceNumber(e.target.value)
+                                if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceNumber; return n })
+                              }}
+                              placeholder="VD: 00004402"
+                              ref={invoiceNumberRef}
+                              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.invoiceNumber ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            />
+                          )
+                        }
+                      </div>
+                    </div>
+
+                    {/* Row 4: Số tiền — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Số tiền (VND)
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <VndInput
+                            value={amount}
+                            onChange={(val) => {
+                              setAmount(val)
+                              if (val > 0) setFormErrors(prev => { const n = { ...prev }; delete n.amount; return n })
+                            }}
+                            placeholder="1.500.000"
+                            className={formErrors.amount ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : ''}
+                          />
+                        )
+                      }
+                    </div>
+
+                    {/* Row 5: Ghi chú — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Ghi chú
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Ghi chú thêm về hóa đơn này..."
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-200 hover:border-slate-300 px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] resize-none"
+                          />
+                        )
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── RETAIL FORM ─── */}
+                {invoiceType === 'RETAIL' && (
+                  <div className="flex flex-col gap-4">
+
+                    {/* Row 1: Tên cửa hàng — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Nơi mua hàng / Tên cửa hàng
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <input
+                            type="text"
+                            value={congTyName}
+                            onChange={(e) => {
+                              setCongTyName(e.target.value)
+                              if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyName; return n })
+                            }}
+                            placeholder="VD: Siêu thị CoopMart, Cửa hàng tạp hóa..."
+                            ref={retailCongTyNameRef}
+                            className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.congTyName ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                          />
+                        )
+                      }
+                    </div>
+
+                    {/* Row 2: Số phiếu | Ngày xuất */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Số phiếu / Mã đơn
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : (
+                            <input
+                              type="text"
+                              value={invoiceNumber}
+                              onChange={(e) => {
+                                setInvoiceNumber(e.target.value)
+                                if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceNumber; return n })
+                              }}
+                              placeholder="VD: HD001234"
+                              ref={retailInvoiceNumberRef}
+                              className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${formErrors.invoiceNumber ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300'}`}
+                            />
+                          )
+                        }
+                      </div>
+                      <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                          Ngày xuất hóa đơn <span className="text-red-500 normal-case font-bold">*</span>
+                        </label>
+                        {isLoadingOCR
+                          ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                          : <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Row 3: Số tiền — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Số tiền (VND)
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <VndInput
+                            value={amount}
+                            onChange={(val) => {
+                              setAmount(val)
+                              if (val > 0) setFormErrors(prev => { const n = { ...prev }; delete n.amount; return n })
+                            }}
+                            placeholder="1.500.000"
+                            className={formErrors.amount ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : ''}
+                          />
+                        )
+                      }
+                    </div>
+
+                    {/* Row 4: Ghi chú — full width */}
+                    <div className={`form-group m-0 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Ghi chú
+                      </label>
+                      {isLoadingOCR
+                        ? <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
+                        : (
+                          <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Ghi chú thêm..."
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-200 hover:border-slate-300 px-3 py-2.5 text-sm text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] resize-none"
+                          />
+                        )
+                      }
+                    </div>
+                  </div>
+                )}
+
+              </form>
+            </div>
+
+            {/* ── Validation Error Banner ── */}
+            {error && (
+              <div ref={errorRef} className="mx-6 mb-4 p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-medium flex-shrink-0">
+                {error}
+              </div>
+            )}
+
+            {/* ── Card Footer: Action Buttons ── */}
+            <div className="px-5 py-4 border-t border-slate-100 flex flex-col gap-2 flex-shrink-0 bg-slate-50/50 rounded-b-2xl sm:flex-row sm:items-center sm:justify-end sm:gap-3 lg:px-6">
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium transition-colors"
-                onClick={() => {
-                  const file = fileInputRef.current?.files?.[0]
-                  if (file) handleInvoiceUpload(file)
-                }}
+                id="btn-cancel"
+                className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-150 shadow-sm min-h-[48px] sm:min-h-0"
+                onClick={resetForm}
+                disabled={isLoadingOCR || isSaving}
               >
-                🔄 Thử lại
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                id="btn-save"
+                form="vat-form"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-white bg-[#1e3a5f] hover:bg-[#16304f] active:bg-[#0f2340] transition-all duration-150 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px] sm:min-h-0"
+                disabled={isLoadingOCR || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Đang đồng bộ...
+                  </>
+                ) : (
+                  <>✅ Xác nhận lưu</>
+                )}
               </button>
             </div>
-          )
-        })()}
-      </div>
-
-      {/* Form Section with Skeleton Loading */}
-      <div className="card">
-        <h2 className="mb-4">{editingId ? `Chỉnh sửa hóa đơn ${invoiceType === 'VAT' ? 'VAT' : 'bán lẻ'}` : `Thông tin hóa đơn ${invoiceType === 'VAT' ? 'VAT' : 'bán lẻ'}`}</h2>
-
-        {/* Skeleton Loading Indicator */}
-        {isLoadingOCR && (
-          <div className="mb-4 p-4 rounded-lg bg-slate-100 border border-slate-200">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-4 w-4 rounded-full bg-brand-400 animate-ping" />
-              <span className="text-sm font-medium text-brand-700">Đang điền dữ liệu tự động...</span>
-            </div>
           </div>
-        )}
-
-        <form id="vat-form" onSubmit={handleSaveAll}>
-          {/* VAT Form - Full Grid */}
-          {invoiceType === 'VAT' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Tên nhà cung cấp / Công ty</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={congTyName}
-                    onChange={(e) => {
-                      setCongTyName(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyName; return n })
-                    }}
-                    placeholder="Nhập tên công ty"
-                    ref={congTyNameRef}
-                    className={formErrors.congTyName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Mã số thuế đối tác</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={congTyMst}
-                    onChange={(e) => {
-                      setCongTyMst(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyMst; return n })
-                    }}
-                    placeholder="Nhập MST"
-                    ref={congTyMstRef}
-                    className={formErrors.congTyMst ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Ngày xuất VAT <span className="text-red-600">*</span></label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Ký hiệu hóa đơn</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={invoiceSymbol}
-                    onChange={(e) => {
-                      setInvoiceSymbol(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceSymbol; return n })
-                    }}
-                    placeholder="VD: AA/23"
-                    ref={invoiceSymbolRef}
-                    className={formErrors.invoiceSymbol ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Số hóa đơn</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={invoiceNumber}
-                    onChange={(e) => {
-                      setInvoiceNumber(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceNumber; return n })
-                    }}
-                    placeholder="VD: 00004402"
-                    ref={invoiceNumberRef}
-                    className={formErrors.invoiceNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Số tiền (VND)</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <VndInput
-                    value={amount}
-                    onChange={(val) => {
-                      setAmount(val)
-                      if (val > 0) setFormErrors(prev => { const n = { ...prev }; delete n.amount; return n })
-                    }}
-                    placeholder="1.500.000"
-                  />
-                )}
-              </div>
-              <div className={`form-group md:col-span-2 lg:col-span-3 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Ghi chú</label>
-                {isLoadingOCR ? (
-                  <div className="h-16 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm..." rows={2} className="input-base w-full" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* RETAIL Form - Simplified Grid */}
-          {invoiceType === 'RETAIL' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Nơi mua hàng / Tên cửa hàng</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={congTyName}
-                    onChange={(e) => {
-                      setCongTyName(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.congTyName; return n })
-                    }}
-                    placeholder="VD: Siêu thị CoopMart, Cửa hàng tạp hóa..."
-                    ref={retailCongTyNameRef}
-                    className={formErrors.congTyName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Số phiếu / Mã đơn</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <input
-                    type="text"
-                    value={invoiceNumber}
-                    onChange={(e) => {
-                      setInvoiceNumber(e.target.value)
-                      if (e.target.value) setFormErrors(prev => { const n = { ...prev }; delete n.invoiceNumber; return n })
-                    }}
-                    placeholder="VD: HD001234"
-                    ref={retailInvoiceNumberRef}
-                    className={formErrors.invoiceNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                  />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Ngày xuất hóa đơn <span className="text-red-600">*</span></label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
-                )}
-              </div>
-              <div className={`form-group ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Số tiền (VND)</label>
-                {isLoadingOCR ? (
-                  <div className="h-10 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <VndInput
-                    value={amount}
-                    onChange={(val) => {
-                      setAmount(val)
-                      if (val > 0) setFormErrors(prev => { const n = { ...prev }; delete n.amount; return n })
-                    }}
-                    placeholder="1.500.000"
-                  />
-                )}
-              </div>
-              <div className={`form-group md:col-span-2 ${isLoadingOCR ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label>Ghi chú</label>
-                {isLoadingOCR ? (
-                  <div className="h-16 rounded-md bg-slate-200 animate-pulse" />
-                ) : (
-                  <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm..." rows={2} className="input-base w-full" />
-                )}
-              </div>
-            </div>
-          )}
-        </form>
+        </div>
       </div>
 
-      {/* Error Message (form validation errors) */}
-      {error && (
-        <div className="mt-4 p-4 rounded-lg bg-red-50 text-red-800 border border-red-200 text-sm font-medium shadow-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Items Table */}
+      {/* ── ITEMS TABLE (below split-screen) ── */}
       {editableItems.length > 0 && (
-        <div className="card mt-4">
+        <div className="card mt-5 flex-shrink-0">
           <h2 className="mb-2">📦 Danh sách mặt hàng bóc tách từ hóa đơn</h2>
           <p className="text-sm text-ink-muted mb-3">
             Dữ liệu đã được làm sạch và chuẩn hóa tự động, có thể điều chỉnh trước khi lưu.
@@ -1560,16 +1666,7 @@ Return valid JSON only.`
         </div>
       )}
 
-      {/* Footer Actions */}
-      <div className="flex justify-end gap-3 mt-6">
-        <button type="button" className="btn" onClick={resetForm} disabled={isLoadingOCR || isSaving}>
-          Hủy bỏ
-        </button>
-        <button type="submit" form="vat-form" className="btn btn-primary" disabled={isLoadingOCR || isSaving}>
-          {isSaving ? '🔄 Đang đồng bộ dữ liệu lên Supabase Cloud...' : `Xác nhận & Lưu ${invoiceType === 'VAT' ? 'hóa đơn VAT' : 'hóa đơn bán lẻ'}`}
-        </button>
-      </div>
-
+      {/* ── Image Viewer Modal ── */}
       {viewerImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -1595,6 +1692,7 @@ Return valid JSON only.`
         </div>
       )}
 
+      {/* ── Duplicate Invoice Confirm Dialog ── */}
       <ConfirmDialog
         open={!!duplicateInvoice}
         onClose={() => setDuplicateInvoice(null)}
@@ -1622,32 +1720,21 @@ Return valid JSON only.`
             let uploadedImageUrl = null
             if (imageFile) {
               try {
-                // imageFile có thể là chuỗi base64 data URL (từ OCR) hoặc File object
                 let fileToUpload = imageFile
                 if (typeof imageFile === 'string' && imageFile.startsWith('data:')) {
                   fileToUpload = dataUrlToBlob(imageFile)
                   if (!fileToUpload) throw new Error('Không chuyển được ảnh sang Blob để upload.')
                 }
-
                 const compressedFile = await resizeAndCompressImage(fileToUpload)
-
                 const safeNumber = String(invoiceNumber || '').trim().replace(/[^a-zA-Z0-9]/g, '_') || 'invoice'
                 const filePath = `${Date.now()}_${safeNumber}.jpg`
-
-                console.log(`[Storage] Uploading (duplicate confirm): ${filePath} (size: ${compressedFile.size} bytes)`)
-
                 const { error: uploadError } = await supabase.storage
                   .from('invoice-images').upload(filePath, compressedFile, { contentType: 'image/jpeg', upsert: false })
-                if (uploadError) {
-                  console.error('Chi tiết lỗi Storage (duplicate confirm):', uploadError)
-                  throw uploadError
-                }
+                if (uploadError) throw uploadError
                 const { data: publicData } = supabase.storage.from('invoice-images').getPublicUrl(filePath)
                 uploadedImageUrl = publicData?.publicUrl || null
-                console.log(`[Storage] Upload thành công: ${uploadedImageUrl}`)
               } catch (err) {
                 console.error('Chi tiết lỗi Storage (duplicate confirm):', err)
-                // Ảnh lỗi thì vẫn lưu hóa đơn không có ảnh, không throw
               }
             }
 
@@ -1658,7 +1745,6 @@ Return valid JSON only.`
               return trimmed
             }
 
-            // Chuẩn hóa RETAIL: supplier_id bắt buộc là null, không tạo supplier
             const isRetailInvoice = invoiceType === 'RETAIL'
             const invoicePayload = {
               invoice_type: invoiceType,
