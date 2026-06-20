@@ -551,8 +551,18 @@
 }
 
 /* ==========================================================================
-   S1a-HKD — Mẫu S1a-HKD theo Thông tư 152/2025/TT-BTC
+   S1a-HKD — Mẫu S1a-HKD theo Thông tư 152/2021/TT-BTC
    ========================================================================== */
+
+/* Page layout */
+.s1a-page {
+  background: #fff;
+  min-height: 100%;
+}
+
+.s1a-ledger-content {
+  background: #fff;
+}
 
 /* Header row: HKD info (left) + Form label (right) */
 .s1a-header {
@@ -607,6 +617,13 @@
   font-size: 0.875rem;
 }
 
+/* Business info compact */
+.s1a-business-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 /* Table */
 .s1a-table-wrapper {
   overflow-x: auto;
@@ -614,7 +631,7 @@
 .s1a-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 /* Header rows */
@@ -622,62 +639,58 @@
   border-bottom: 1px solid #1E293B;
 }
 .s1a-table thead th {
-  padding: 4px 8px;
+  padding: 3px 6px;
   font-weight: 600;
   text-align: left;
   vertical-align: bottom;
   border: 1px solid #1E293B;
   background: transparent;
 }
-.s1a-th { font-size: 0.875rem; }
+.s1a-th { font-size: 0.8125rem; }
 .s1a-th-symbol {
   font-weight: 400;
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-align: right !important;
   padding-right: 8px !important;
-  padding-top: 2px !important;
+  padding-top: 1px !important;
   border-top: none !important;
 }
 .s1a-th-symbol-right { text-align: right !important; }
 
 /* Column widths */
-.s1a-th-date    { width: 110px; }
-.s1a-th-amount  { width: 160px; text-align: right !important; }
+.s1a-th-date    { width: 75px; min-width: 75px; }
+.s1a-th-amount  { min-width: 100px; }
 
 /* Data rows */
 .s1a-data-row td {
-  padding: 4px 8px;
+  padding: 3px 6px;
   vertical-align: top;
   border: 1px solid #1E293B;
 }
 .s1a-td-date    { white-space: nowrap; }
-.s1a-td-desc    { color: #1E293B; }
+.s1a-td-desc    { color: #1E293B; word-break: break-word; }
 .s1a-td-amount  {
-  text-align: right;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Total row */
 .s1a-total-row td {
-  padding: 5px 8px;
+  padding: 4px 6px;
   border: 1px solid #1E293B;
 }
 .s1a-total-label {
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 .s1a-total-amount {
-  text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Empty row */
 .s1a-empty {
-  padding: 16px 8px;
+  padding: 12px 6px;
   text-align: center;
   color: #64748B;
   font-style: italic;
@@ -686,12 +699,93 @@
 
 /* Footer signature */
 .s1a-footer {
-  margin-top: 1.5rem;
+  margin-top: 0.75rem;
   text-align: right;
 }
-.s1a-footer-date  { margin: 0 0 2px; font-size: 0.875rem; }
-.s1a-footer-title { margin: 0 0 2px; font-size: 0.875rem; font-weight: 700; }
-.s1a-footer-note   { margin: 0; font-size: 0.8rem; color: #64748B; }
+.s1a-footer-date  { margin: 0 0 2px; font-size: 0.8125rem; }
+.s1a-footer-title { margin: 0 0 2px; font-size: 0.8125rem; font-weight: 700; }
+.s1a-footer-note   { margin: 0; font-size: 0.75rem; color: #64748B; }
+
+/* Mobile responsive for table */
+@media (max-width: 640px) {
+  .s1a-ledger-content {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .s1a-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .s1a-header-left,
+  .s1a-header-right {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .s1a-info-line {
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .s1a-main-title {
+    font-size: 0.875rem;
+  }
+
+  .s1a-meta-line {
+    font-size: 0.75rem;
+  }
+
+  .s1a-table {
+    font-size: 0.75rem;
+  }
+
+  .s1a-table thead th,
+  .s1a-data-row td,
+  .s1a-total-row td,
+  .s1a-empty {
+    padding: 4px 4px;
+  }
+
+  .s1a-th-date { width: 65px; min-width: 65px; }
+  .s1a-th-amount { min-width: 90px; }
+
+  .s1a-td-amount,
+  .s1a-total-amount {
+    min-width: 90px;
+  }
+
+  .s1a-footer {
+    margin-top: 0.5rem;
+  }
+}
+
+/* ==========================================================================
+   Print Styles - S1A Ledger
+   ========================================================================== */
+@media print {
+  .s1a-page {
+    padding: 0;
+  }
+
+  .s1a-ledger-content {
+    display: none;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-document {
+    padding: 20px;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
 
 /* ==========================================================================
    Responsive + sidebar collapse + mobile

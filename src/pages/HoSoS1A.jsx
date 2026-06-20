@@ -9,140 +9,10 @@ import S1AList from '../components/s1a/S1AList'
 import AddTicketForm from '../components/s1a/AddTicketForm'
 import AddMonthlyRevenueForm from '../components/s1a/AddMonthlyRevenueForm'
 import SoS1aHKD from '../components/s1a/SoS1aHKD'
+import CloseBookForm from '../components/s1a/CloseBookForm'
 
 // ─────────────────────────────────────────
-// Sub-page Wrappers (lightweight shells)
-// ─────────────────────────────────────────
-function LedgerPage({ onBack }) {
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Sổ S1A-HKD</h2>
-          <p className="sub-page-subtitle">Mẫu sổ theo Thông tư 152/2025/TT-BTC</p>
-        </div>
-      </div>
-      <div className="sub-page-content">
-        <div className="form-card">
-          <p className="form-hint">Hệ thống tự động gom toàn bộ phiếu doanh thu trong kỳ kê khai, tổng hợp theo 3 cột chuẩn.</p>
-          <SoS1aHKD />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CloseBookPage({ onBack }) {
-  const [month, setMonth] = useState(new Date().getMonth() + 1)
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState(null)
-  const [closedPeriods, setClosedPeriods] = useState([])
-
-  useEffect(() => {
-    const stored = localStorage.getItem('closed_periods')
-    if (stored) setClosedPeriods(JSON.parse(stored))
-  }, [])
-
-  const handleCloseBook = async () => {
-    const ym = `${year}-${String(month).padStart(2, '0')}`
-    if (closedPeriods.includes(ym)) {
-      setMsg({ type: 'error', text: `Tháng ${month}/${year} đã được chốt sổ.` })
-      return
-    }
-    setSubmitting(true)
-    try {
-      if (isSupabaseConfigured()) {
-        await supabase.from('closed_periods').insert([{ period_month: ym }])
-      }
-      const updated = [...closedPeriods, ym].sort()
-      setClosedPeriods(updated)
-      localStorage.setItem('closed_periods', JSON.stringify(updated))
-      setMsg({ type: 'success', text: `Đã chốt sổ tháng ${month}/${year}.` })
-    } catch (err) {
-      setMsg({ type: 'error', text: err.message || 'Không thể chốt sổ.' })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="sub-page">
-      <div className="sub-page-header">
-        <button type="button" className="back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Quay lại Hub
-        </button>
-        <div className="sub-page-title">
-          <h2>Chốt sổ S1A</h2>
-          <p className="sub-page-subtitle">Khoá số liệu kỳ kê khai</p>
-        </div>
-      </div>
-      <div className="sub-page-content">
-        <div className="form-card">
-          <p className="form-hint">Sau khi chốt sổ, phiếu trong kỳ không thể chỉnh sửa hoặc xóa.</p>
-          <div className="form-stack">
-            <div className="form-row">
-              <div className="form-group">
-                <label>Tháng</label>
-                <select value={month} onChange={e => setMonth(Number(e.target.value))} className="input-base">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <option key={m} value={m}>Tháng {m}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Năm</label>
-                <input
-                  type="number"
-                  value={year}
-                  onChange={e => setYear(Number(e.target.value) || new Date().getFullYear())}
-                  min={2020}
-                  max={2030}
-                  className="input-base"
-                />
-              </div>
-              <div className="form-actions-self">
-                <button type="button" className="btn btn-primary" onClick={handleCloseBook} disabled={submitting}>
-                  {submitting ? 'Đang chốt...' : 'Chốt sổ tháng này'}
-                </button>
-              </div>
-            </div>
-            {msg && (
-              <div className={`msg-box ${msg.type === 'success' ? 'msg-success' : 'msg-error'}`}>
-                {msg.text}
-              </div>
-            )}
-            <div className="closed-list">
-              <strong className="text-sm font-semibold">Các kỳ đã chốt:</strong>
-              {closedPeriods.length === 0 ? (
-                <p className="text-sm text-muted mt-1">Chưa chốt kỳ nào.</p>
-              ) : (
-                <ul className="mt-1">
-                  {closedPeriods.map(ym => {
-                    const [y, m] = ym.split('-')
-                    return <li key={ym} className="text-sm">Tháng {Number(m)}/{y}</li>
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────
-// Hub Page
+// Hub Page - Navigation Cards
 // ─────────────────────────────────────────
 const NAV_CARDS = [
   {
@@ -211,12 +81,14 @@ const NAV_CARDS = [
   },
 ]
 
+// ─────────────────────────────────────────
+// Main Component: HoSoS1A
+// ─────────────────────────────────────────
 export default function HoSoS1A() {
-  const [view, setView] = useState('hub') // 'hub' | 'list' | 'add' | 'batchAdd' | 'ledger' | 'closeBook'
+  const [view, setView] = useState('hub')
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({ tickets: 0, total: 0 })
 
-  // Fetch stats for hub
   const fetchStats = useCallback(async () => {
     if (!isSupabaseConfigured()) return
     setLoading(true)
@@ -238,7 +110,6 @@ export default function HoSoS1A() {
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  // Re-fetch stats when returning to hub
   const handleBack = useCallback(() => {
     setView('hub')
     fetchStats()
@@ -246,15 +117,14 @@ export default function HoSoS1A() {
 
   return (
     <div className="page-shell">
+      {/* Hub View */}
       {view === 'hub' && (
         <>
-          {/* Page Header */}
           <div className="page-topbar-new">
             <h1 className="page-title-new">Hồ sơ S1A</h1>
             <p className="page-subtitle-new">Sổ doanh thu bán hàng hóa, dịch vụ · Thông tư 152/2025/TT-BTC</p>
           </div>
 
-          {/* Stats Bar */}
           <div className="hub-stats-bar">
             <div className="hub-stat">
               <span className="hub-stat-value">{loading ? '—' : stats.tickets}</span>
@@ -267,7 +137,6 @@ export default function HoSoS1A() {
             </div>
           </div>
 
-          {/* Navigation Cards Grid */}
           <div className="nav-cards-grid">
             {NAV_CARDS.map((card) => (
               <button
@@ -292,12 +161,12 @@ export default function HoSoS1A() {
         </>
       )}
 
-      {/* Sub-pages - using external components */}
+      {/* Sub-pages */}
       {view === 'list' && <S1AList onBack={handleBack} />}
       {view === 'add' && <AddTicketForm onBack={handleBack} />}
       {view === 'batchAdd' && <AddMonthlyRevenueForm onBack={handleBack} />}
-      {view === 'ledger' && <LedgerPage onBack={handleBack} />}
-      {view === 'closeBook' && <CloseBookPage onBack={handleBack} />}
+      {view === 'ledger' && <SoS1aHKD onBack={handleBack} />}
+      {view === 'closeBook' && <CloseBookForm onBack={handleBack} />}
     </div>
   )
 }

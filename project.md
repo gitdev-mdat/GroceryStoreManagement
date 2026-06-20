@@ -46,118 +46,118 @@
 
 > **Chuẩn hóa theo Supabase / PostgreSQL.** Tất cả bảng đều có `created_at` và `updated_at` để theo dõi thời gian.
 
-### 3.1 Bảng `business_profiles`
+  ### 3.1 Bảng `business_profiles`
 
-Lưu thông tin đăng ký của hộ kinh doanh.
+  Lưu thông tin đăng ký của hộ kinh doanh.
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID hộ kinh doanh |
-| `owner_name` | `text` | NOT NULL | Tên chủ hộ / người đại diện |
-| `business_name` | `text` | NOT NULL | Tên cửa hàng / đơn vị |
-| `tax_code` | `text` | UNIQUE | Mã số thuế |
-| `address` | `text` | NULL | Địa chỉ kinh doanh |
-| `phone_number` | `text` | NULL | Số điện thoại liên hệ |
-| `business_start_date` | `date` | NULL | Ngày bắt đầu hoạt động |
-| `business_type` | `text` | NULL | Loại hình S1a, S2a,... |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
-| `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID hộ kinh doanh |
+  | `owner_name` | `text` | NOT NULL | Tên chủ hộ / người đại diện |
+  | `business_name` | `text` | NOT NULL | Tên cửa hàng / đơn vị |
+  | `tax_code` | `text` | UNIQUE | Mã số thuế |
+  | `address` | `text` | NULL | Địa chỉ kinh doanh |
+  | `phone_number` | `text` | NULL | Số điện thoại liên hệ |
+  | `business_start_date` | `date` | NULL | Ngày bắt đầu hoạt động |
+  | `business_type` | `text` | NULL | Loại hình S1a, S2a,... |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
+  | `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
 
-### 3.2 Bảng `suppliers`
+  ### 3.2 Bảng `suppliers`
 
-Danh mục nhà cung cấp (đối tác mua hàng).
+  Danh mục nhà cung cấp (đối tác mua hàng).
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID nhà cung cấp |
-| `company_name` | `text` | NOT NULL | Tên công ty / cửa hàng |
-| `tax_code` | `text` | UNIQUE | Mã số thuế |
-| `address` | `text` | NULL | Địa chỉ |
-| `phone_number` | `text` | NULL | Số điện thoại |
-| `notes` | `text` | NULL | Ghi chú nội bộ |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
-| `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID nhà cung cấp |
+  | `company_name` | `text` | NOT NULL | Tên công ty / cửa hàng |
+  | `tax_code` | `text` | UNIQUE | Mã số thuế |
+  | `address` | `text` | NULL | Địa chỉ |
+  | `phone_number` | `text` | NULL | Số điện thoại |
+  | `notes` | `text` | NULL | Ghi chú nội bộ |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
+  | `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
 
-> **Quy tắc tự động tạo:** Khi nhập hóa đơn, nếu MST nhà cung cấp chưa có trong bảng `suppliers`, hệ thống sẽ tự động tạo mới.
+  > **Quy tắc tự động tạo:** Khi nhập hóa đơn, nếu MST nhà cung cấp chưa có trong bảng `suppliers`, hệ thống sẽ tự động tạo mới.
 
-### 3.3 Bảng `invoices`
+  ### 3.3 Bảng `invoices`
 
-Lưu nhật ký hóa đơn VAT đầu vào.
+  Lưu nhật ký hóa đơn VAT đầu vào.
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID hóa đơn |
-| `serial_number` | `text` | NOT NULL | Ký hiệu hóa đơn |
-| `invoice_number` | `text` | NOT NULL | Số hóa đơn |
-| `issue_date` | `date` | NOT NULL | Ngày xuất hóa đơn (YYYY-MM-DD) |
-| `invoice_type` | `varchar` | NOT NULL | VAT / RETAIL |
-| `total_amount` | `numeric` | NOT NULL | Tổng tiền thanh toán |
-| `subtotal_amount` | `numeric` | NULL | Tổng tiền trước VAT |
-| `vat_amount` | `numeric` | NULL | Tổng VAT |
-| `notes` | `text` | NULL | Ghi chú |
-| `supplier_id` | `uuid` | FK | Nhà cung cấp |
-| `created_by` | `uuid` | NULL | Người nhập liệu |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
-| `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID hóa đơn |
+  | `serial_number` | `text` | NOT NULL | Ký hiệu hóa đơn |
+  | `invoice_number` | `text` | NOT NULL | Số hóa đơn |
+  | `issue_date` | `date` | NOT NULL | Ngày xuất hóa đơn (YYYY-MM-DD) |
+  | `invoice_type` | `varchar` | NOT NULL | VAT / RETAIL |
+  | `total_amount` | `numeric` | NOT NULL | Tổng tiền thanh toán |
+  | `subtotal_amount` | `numeric` | NULL | Tổng tiền trước VAT |
+  | `vat_amount` | `numeric` | NULL | Tổng VAT |
+  | `notes` | `text` | NULL | Ghi chú |
+  | `supplier_id` | `uuid` | FK | Nhà cung cấp |
+  | `created_by` | `uuid` | NULL | Người nhập liệu |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
+  | `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
 
-### 3.4 Bảng `products`
+  ### 3.4 Bảng `products`
 
-Danh mục sản phẩm chuẩn hóa (đã được AI xử lý).
+  Danh mục sản phẩm chuẩn hóa (đã được AI xử lý).
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID sản phẩm |
-| `product_name` | `text` | NOT NULL | Tên sản phẩm chuẩn hóa |
-| `unit` | `text` | NOT NULL | Đơn vị tính |
-| `status` | `text` | DEFAULT 'ACTIVE' | ACTIVE / INACTIVE |
-| `first_seen_date` | `date` | DEFAULT current_date | Ngày xuất hiện đầu tiên |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
-| `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID sản phẩm |
+  | `product_name` | `text` | NOT NULL | Tên sản phẩm chuẩn hóa |
+  | `unit` | `text` | NOT NULL | Đơn vị tính |
+  | `status` | `text` | DEFAULT 'ACTIVE' | ACTIVE / INACTIVE |
+  | `first_seen_date` | `date` | DEFAULT current_date | Ngày xuất hiện đầu tiên |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
+  | `updated_at` | `timestamp` | DEFAULT now() | Ngày cập nhật |
 
-> **Lưu ý:** Tên sản phẩm được AI chuẩn hóa (không dùng raw từ OCR), đồng nhất về chính tả và cách gọi.
+  > **Lưu ý:** Tên sản phẩm được AI chuẩn hóa (không dùng raw từ OCR), đồng nhất về chính tả và cách gọi.
 
-### 3.5 Bảng `price_history`
+  ### 3.5 Bảng `price_history`
 
-Lịch sử biến động giá nhập của từng sản phẩm (giải quyết bài toán **nhiều giá, khác ngày**).
+  Lịch sử biến động giá nhập của từng sản phẩm (giải quyết bài toán **nhiều giá, khác ngày**).
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID lịch sử giá |
-| `product_id` | `uuid` | FK | Sản phẩm |
-| `invoice_id` | `uuid` | FK | Hóa đơn |
-| `import_date` | `date` | NOT NULL | Ngày nhập |
-| `unit_price_after_vat` | `numeric` | NOT NULL | Giá nhập sau VAT |
-| `quantity` | `numeric` | NOT NULL | Số lượng |
-| `row_type` | `text` | CHECK (PURCHASE, PROMOTION) | PURCHASE = mua hàng, PROMOTION = khuyến mãi |
-| `suggested_retail_price` | `numeric` | NULL | Giá bán lẻ đề xuất |
-| `is_active_price` | `boolean` | DEFAULT TRUE | Giá hiện hành |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID lịch sử giá |
+  | `product_id` | `uuid` | FK | Sản phẩm |
+  | `invoice_id` | `uuid` | FK | Hóa đơn |
+  | `import_date` | `date` | NOT NULL | Ngày nhập |
+  | `unit_price_after_vat` | `numeric` | NOT NULL | Giá nhập sau VAT |
+  | `quantity` | `numeric` | NOT NULL | Số lượng |
+  | `row_type` | `text` | CHECK (PURCHASE, PROMOTION) | PURCHASE = mua hàng, PROMOTION = khuyến mãi |
+  | `suggested_retail_price` | `numeric` | NULL | Giá bán lẻ đề xuất |
+  | `is_active_price` | `boolean` | DEFAULT TRUE | Giá hiện hành |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo |
 
-### 3.6 Bảng `sales_tickets`
+  ### 3.6 Bảng `sales_tickets`
 
-Lưu phiếu doanh thu bán ra của Sổ S1A (Sổ Doanh thu bán hàng hoá, dịch vụ).
+  Lưu phiếu doanh thu bán ra của Sổ S1A (Sổ Doanh thu bán hàng hoá, dịch vụ).
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID phiếu doanh thu |
-| `ticket_number` | `text` | NULL | Số phiếu (tùy chọn) |
-| `sale_date` | `date` | DEFAULT current_date | Ngày bán (YYYY-MM-DD) |
-| `total_amount` | `numeric` | NOT NULL DEFAULT 0 | Tổng tiền doanh thu |
-| `group_key` | `text` | DEFAULT 'Hàng hóa tổng hợp' | Nhóm hàng hóa/dịch vụ |
-| `notes` | `text` | NULL | Ghi chú thêm |
-| `created_at` | `timestamp` | DEFAULT now() | Ngày tạo bản ghi |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID phiếu doanh thu |
+  | `ticket_number` | `text` | NULL | Số phiếu (tùy chọn) |
+  | `sale_date` | `date` | DEFAULT current_date | Ngày bán (YYYY-MM-DD) |
+  | `total_amount` | `numeric` | NOT NULL DEFAULT 0 | Tổng tiền doanh thu |
+  | `group_key` | `text` | DEFAULT 'Hàng hóa tổng hợp' | Nhóm hàng hóa/dịch vụ |
+  | `notes` | `text` | NULL | Ghi chú thêm |
+  | `created_at` | `timestamp` | DEFAULT now() | Ngày tạo bản ghi |
 
-> **Nghiệp vụ:** Đây là bảng chính thức lưu doanh thu bán lẻ hàng ngày của hộ kinh doanh, dùng để xuất Sổ S1a-HKD theo Thông tư 152/2025/TT-BTC.
+  > **Nghiệp vụ:** Đây là bảng chính thức lưu doanh thu bán lẻ hàng ngày của hộ kinh doanh, dùng để xuất Sổ S1a-HKD theo Thông tư 152/2025/TT-BTC.
 
-### 3.7 Bảng `closed_periods`
+  ### 3.7 Bảng `closed_periods`
 
-Lưu các kỳ kế toán đã chốt sổ.
+  Lưu các kỳ kế toán đã chốt sổ.
 
-| Column | Type | Constraint | Mô tả |
-|--------|------|------------|-------|
-| `id` | `uuid` | PK | ID bản ghi |
-| `period_month` | `text` | NOT NULL UNIQUE | Kỳ đã chốt (YYYY-MM) |
-| `closed_at` | `timestamp` | DEFAULT now() | Thời gian chốt sổ |
+  | Column | Type | Constraint | Mô tả |
+  |--------|------|------------|-------|
+  | `id` | `uuid` | PK | ID bản ghi |
+  | `period_month` | `text` | NOT NULL UNIQUE | Kỳ đã chốt (YYYY-MM) |
+  | `closed_at` | `timestamp` | DEFAULT now() | Thời gian chốt sổ |
 
 > **Nghiệp vụ:** Khi một kỳ đã chốt sổ, hệ thống sẽ khóa các chức năng thêm/sửa/xóa phiếu của tháng đó, đảm bảo minh bạch với cơ quan thuế.
 
@@ -275,7 +275,7 @@ gia_ban_le_goi_y = gia_nhap_sau_vat * 1.15
 ```
 1. Người dùng chụp/upload ảnh hóa đơn
    ↓
-2. Frontend gửi ảnh → Gemini OCR (gemini-1.5-flash)
+2. Frontend gửi ảnh → Gemini OCR (gemini-2.5-flash)
    ↓
 3. Nhận JSON kết quả → Hiển thị preview cho người dùng kiểm tra
    ↓
@@ -355,6 +355,26 @@ Mọi trang con (Danh sách phiếu, Thêm phiếu, Thêm doanh thu tháng, Khó
   margin: 0 0 4px;
 }
 ```
+
+### 8.4 Tỷ lệ vàng cho biểu mẫu 3 cột trên Mobile
+
+Mọi bảng dữ liệu có 3 cột (Ngày tháng / Diễn giải / Số tiền) trên giao diện **Mobile** bắt buộc áp dụng tỷ lệ sau:
+
+| Cột | Tỷ lệ | Class | Style |
+|-----|--------|-------|-------|
+| **Cột 1** — Ngày tháng / Mã số | 25% | `w-[25%] text-center whitespace-nowrap` | Căn giữa, không xuống dòng |
+| **Cột 2** — Diễn giải / Nội dung | 50% | `w-[50%] break-words text-left` | Tự động xuống hàng khi quá dài |
+| **Cột 3** — Số tiền / Giá trị | 25% | `w-[25%] text-right whitespace-nowrap text-green-600 font-bold` | Căn phải, xanh lá, không xuống dòng |
+
+**Quy tắc bắt buộc:**
+
+- Bảng phải bọc trong `overflow-x-auto` để cuộn ngang khi cần.
+- Padding mỗi ô: `px-2 py-2` (ngắn gọn, phù hợp mobile).
+- Hàng CỘNG (footer): dùng `bg-amber-50` nền vàng nhạt để phân biệt.
+- Đơn vị tiền tệ: luôn có ký tự `đ` hoặc `VND` đứng sau số, dùng `whitespace-nowrap` để không bị cắt.
+- Hint hướng dẫn mobile (ẩn khi in): `↑ Vuốt ngang để xem cột Số tiền ↑`
+
+> **Mục đích:** Tỷ lệ 25/50/25 giúp cột Số tiền luôn lộ diện tinh tế ở mép phải màn hình mobile mà không bị giấu kín hoàn toàn, đồng thời cột Diễn giải có đủ không gian hiển thị nội dung.
 
 ---
 
