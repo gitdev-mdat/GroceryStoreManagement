@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Eye, EyeOff, User, Lock, Mail, Check } from 'lucide-react'
 
 // ── Hardcoded credentials ─────────────────────────────────────────────────────
-const VALID_EMAIL    = 'admin'
-const VALID_PASSWORD = '123456'
+const VALID_USERNAMES = ['admin', 'admin@gmail.com']
+const VALID_PASSWORD  = '123456'
 
 // ── Branding Panel — Left Side ────────────────────────────────────────────────
 function BrandPanel() {
@@ -198,8 +198,8 @@ export default function LoginPage({ onLogin }) {
     setError('')
 
     if (isLogin) {
-      // ── Hardcoded auth check ──
-      if (email.trim() === VALID_EMAIL && password === VALID_PASSWORD) {
+      // ── Hardcoded auth check — accepts "admin" OR "admin@gmail.com" ──
+      if (VALID_USERNAMES.includes(email.trim()) && password === VALID_PASSWORD) {
         setLoading(true)
         setTimeout(() => {
           setLoading(false)
@@ -279,7 +279,7 @@ export default function LoginPage({ onLogin }) {
 
             <FormInput id="email" label="Tên đăng nhập / Email" type="text"
               value={email} onChange={(e) => { setEmail(e.target.value); setError('') }}
-              placeholder={isLogin ? 'admin' : 'email@example.com'}
+              placeholder={isLogin ? 'admin hoặc admin@gmail.com' : 'email@example.com'}
               icon={isLogin ? User : Mail} disabled={loading} />
 
             <FormInput id="password" label="Mật khẩu"
@@ -312,9 +312,14 @@ export default function LoginPage({ onLogin }) {
             )}
 
             {isLogin && (
-              <div className="flex items-center justify-between pt-0.5">
-                <Checkbox id="remember" checked={remember} onChange={setRemember} label="Ghi nhớ đăng nhập" />
-                <button type="button" className="text-sm font-semibold text-[#1e3a5f] hover:text-[#16304f] hover:underline underline-offset-2 transition-colors">
+              <div className="flex items-center justify-between gap-2 pt-0.5 w-full min-w-0">
+                <div className="flex-shrink-0">
+                  <Checkbox id="remember" checked={remember} onChange={setRemember} label="Ghi nhớ đăng nhập" />
+                </div>
+                <button
+                  type="button"
+                  className="flex-shrink-0 text-sm font-semibold text-[#1e3a5f] hover:text-[#16304f] hover:underline underline-offset-2 transition-colors whitespace-nowrap"
+                >
                   Quên mật khẩu?
                 </button>
               </div>
@@ -331,8 +336,14 @@ export default function LoginPage({ onLogin }) {
 
             {/* Hint for test account — login only */}
             {isLogin && (
-              <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                💡 Tài khoản thử: <span className="font-mono font-semibold text-slate-600">admin</span> / <span className="font-mono font-semibold text-slate-600">123456</span>
+              <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 leading-relaxed">
+                💡 Tài khoản thử:{' '}
+                <span className="font-mono font-semibold text-slate-600">admin</span>
+                {' '}hoặc{' '}
+                <span className="font-mono font-semibold text-slate-600">admin@gmail.com</span>
+                {' '}·{' '}
+                mật khẩu:{' '}
+                <span className="font-mono font-semibold text-slate-600">123456</span>
               </p>
             )}
 
