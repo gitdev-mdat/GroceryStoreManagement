@@ -3,7 +3,7 @@ import { Eye, EyeOff, User, Lock, Mail, Check } from 'lucide-react'
 
 // ── Hardcoded credentials ─────────────────────────────────────────────────────
 const VALID_USERNAMES = ['admin', 'admin@gmail.com']
-const VALID_PASSWORD  = '123456'
+const VALID_PASSWORD = '123456'
 
 // ── Branding Panel — Left Side ────────────────────────────────────────────────
 function BrandPanel() {
@@ -65,10 +65,10 @@ function BrandPanel() {
               <div className="text-white/40 text-xs font-semibold uppercase tracking-wide">Nhật ký hóa đơn</div>
             </div>
             {[
-              { label: 'Hóa mỹ phẩm', value: '8.4M',  dot: 'bg-sky-400' },
-              { label: 'Thực phẩm',   value: '14.2M', dot: 'bg-emerald-400' },
-              { label: 'Gia dụng',    value: '5.9M',  dot: 'bg-violet-400' },
-              { label: 'Tươi sống',   value: '9.7M',  dot: 'bg-amber-400' },
+              { label: 'Hóa mỹ phẩm', value: '8.4M', dot: 'bg-sky-400' },
+              { label: 'Thực phẩm', value: '14.2M', dot: 'bg-emerald-400' },
+              { label: 'Gia dụng', value: '5.9M', dot: 'bg-violet-400' },
+              { label: 'Tươi sống', value: '9.7M', dot: 'bg-amber-400' },
             ].map((row, i) => (
               <div key={row.label} className={`flex items-center justify-between px-4 py-2.5 ${i < 3 ? 'border-b border-white/5' : ''}`}>
                 <div className="flex items-center gap-2">
@@ -83,8 +83,8 @@ function BrandPanel() {
           {/* Progress bars */}
           <div className="bg-white/8 rounded-xl border border-white/10 p-4 space-y-3">
             {[
-              { label: 'Hoàn thành sổ sách',    pct: 78 },
-              { label: 'Hóa đơn VAT đã nhập',   pct: 55 },
+              { label: 'Hoàn thành sổ sách', pct: 78 },
+              { label: 'Hóa đơn VAT đã nhập', pct: 55 },
             ].map((bar) => (
               <div key={bar.label}>
                 <div className="flex justify-between mb-1">
@@ -130,7 +130,7 @@ function FormInput({ id, label, type = 'text', value, onChange, placeholder, ico
           disabled={disabled}
           autoComplete="off"
           className={`w-full min-h-[48px] rounded-xl border border-slate-200 bg-slate-50/60
-            text-sm text-slate-800 placeholder-slate-400
+            text-base text-slate-800 placeholder-slate-400
             outline-none transition-all duration-150
             hover:border-slate-300
             focus:bg-white focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10
@@ -153,9 +153,8 @@ function Checkbox({ id, checked, onChange, label }) {
         type="button"
         id={id}
         onClick={() => onChange(!checked)}
-        className={`w-4 h-4 rounded flex items-center justify-center border transition-all duration-150 flex-shrink-0 ${
-          checked ? 'bg-[#1e3a5f] border-[#1e3a5f]' : 'bg-white border-slate-300 hover:border-[#1e3a5f]'
-        }`}
+        className={`w-4 h-4 rounded flex items-center justify-center border transition-all duration-150 flex-shrink-0 ${checked ? 'bg-[#1e3a5f] border-[#1e3a5f]' : 'bg-white border-slate-300 hover:border-[#1e3a5f]'
+          }`}
       >
         {checked && <Check size={10} strokeWidth={3} className="text-white" />}
       </button>
@@ -179,17 +178,17 @@ function ErrorAlert({ message }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function LoginPage({ onLogin }) {
-  const [mode, setMode]             = useState('login')
-  const [showPass, setShowPass]     = useState(false)
+  const [mode, setMode] = useState('login')
+  const [showPass, setShowPass] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [remember, setRemember]     = useState(false)
-  const [loading, setLoading]       = useState(false)
-  const [error, setError]           = useState('')
+  const [remember, setRemember] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const [email, setEmail]           = useState('')
-  const [password, setPassword]     = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [fullName, setFullName]     = useState('')
+  const [fullName, setFullName] = useState('')
 
   const isLogin = mode === 'login'
 
@@ -211,7 +210,7 @@ export default function LoginPage({ onLogin }) {
     } else {
       // Register: just simulate success
       if (!fullName.trim()) { setError('Vui lòng nhập họ và tên.'); return }
-      if (!email.trim())    { setError('Vui lòng nhập email.');       return }
+      if (!email.trim()) { setError('Vui lòng nhập email.'); return }
       if (password.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự.'); return }
       if (password !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return }
       setLoading(true)
