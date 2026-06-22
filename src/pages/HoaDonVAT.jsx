@@ -88,7 +88,7 @@ function FloatingToast({ message, onDismiss }) {
 // ── Auto-compress image to JPEG < 500KB using Canvas ─────────────────────────
 // Không bao giờ reject file — luôn compress đến khi đủ nhỏ
 async function compressToDataUrl(file, targetBytes = 500 * 1024) {
-  // Nếu file đã đủ nhỏ và là ảnh JPEG/PNG, chuyển thẳng
+  // Fast path: file đã đủ nhỏ và là JPEG/PNG
   if (file.size <= targetBytes && (file.type === 'image/jpeg' || file.type === 'image/png')) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -97,43 +97,69 @@ async function compressToDataUrl(file, targetBytes = 500 * 1024) {
       reader.readAsDataURL(file)
     })
   }
+
   return new Promise((resolve, reject) => {
     const img = new Image()
+    let objectUrl = null
+
+    const cleanup = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+
     img.onload = () => {
+      cleanup()
       try {
-        // Bắt đầu với kích thước gốc, giảm dần nếu vẫn quá lớn
-        let maxDim = 1600
-        let quality = 0.82
-        const tryCompress = () => {
-          const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1)
-          const w = Math.round(img.width * ratio)
-          const h = Math.round(img.height * ratio)
-          const canvas = document.createElement('canvas')
-          canvas.width = w
-          canvas.height = h
-          const ctx = canvas.getContext('2d')
-          ctx.drawImage(img, 0, 0, w, h)
-          const dataUrl = canvas.toDataURL('image/jpeg', quality)
-          // Ước lượng kích thước bytes của base64 string
-          const estimatedBytes = Math.round((dataUrl.length * 3) / 4)
-          if (estimatedBytes > targetBytes && (quality > 0.45 || maxDim > 600)) {
-            // Giảm quality 10% hoặc kích thước 80% mỗi vòng lặp
-            if (quality > 0.50) {
-              quality = Math.max(0.45, quality - 0.10)
-            } else {
-              maxDim = Math.max(600, Math.round(maxDim * 0.80))
-              quality = 0.70 // reset quality khi giảm kích thước
-            }
-            tryCompress()
-          } else {
-            resolve(dataUrl)
-          }
+        let width = img.width
+        let height = img.height
+        const maxDim = 1600
+
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
         }
-        tryCompress()
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+
+        let quality = 0.65
+        let dataUrl = canvas.toDataURL('image/jpeg', quality)
+        let estimatedBytes = Math.round((dataUrl.length * 3) / 4)
+
+        while (estimatedBytes > targetBytes && quality > 0.3) {
+          quality = Math.max(0.3, quality - 0.1)
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+          estimatedBytes = Math.round((dataUrl.length * 3) / 4)
+        }
+
+        if (estimatedBytes > targetBytes) {
+          const scale = Math.sqrt(targetBytes / estimatedBytes) * 0.9
+          const newWidth = Math.max(1, Math.round(width * scale))
+          const newHeight = Math.max(1, Math.round(height * scale))
+
+          canvas.width = newWidth
+          canvas.height = newHeight
+          ctx.drawImage(img, 0, 0, newWidth, newHeight)
+
+          dataUrl = canvas.toDataURL('image/jpeg', 0.6)
+        }
+
+        resolve(dataUrl)
       } catch (err) {
         reject(err)
       }
     }
+
+    img.onerror = () => {
+      cleanup()
+      reject(new Error('Không đọc được ảnh.'))
+    }
+
+    objectUrl = URL.createObjectURL(file)
+    img.src = objectUrl
   })
 }
 
@@ -564,31 +590,28 @@ export default function HoaDonVAT() {
   const handleFileChange = async (e) => {
     setError('')
     setToastMsg('')
-    setOcrMessage('')
+    setOcrMessage('📸 Đang nén ảnh từ điện thoại...')
     setRetryableError(null)
+
     const file = e.target.files?.[0]
     if (!file) {
       setImageFile(null)
       setImagePreview(null)
       return
     }
+
     if (!file.type.startsWith('image/')) {
       showError('Vui lòng chọn file ảnh (jpg, png, ...).')
       setImageFile(null)
       setImagePreview(null)
       return
     }
-    // ── Auto-compress: không bao giờ reject ảnh lớn ──────────────────
+
     try {
-      const isLarge = file.size > 500 * 1024
-      if (isLarge) {
-        setOcrMessage('📸 Đang nén ảnh từ điện thoại...')
-      }
       const dataUrl = await compressToDataUrl(file, 500 * 1024)
       setImageFile(dataUrl)
       setImagePreview(dataUrl)
       setOcrMessage('')
-      // Truyền file gốc cho Gemini — resizeAndCompressImage bên trong sẽ nén lại
       await handleInvoiceUpload(file)
     } catch (err) {
       showError(err.message || 'Không đọc được ảnh. Vui lòng thử lại.')
@@ -1273,17 +1296,17 @@ Return valid JSON only.`
           {/* Upload / Preview Zone */}
           <div
             id="invoice-dropzone"
-            className={`relative rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center transition-all duration-200 cursor-pointer overflow-hidden
+            className={`relative rounded-2xl border-2 flex flex-col items-center justify-center text-center transition-all duration-200 overflow-hidden
               h-[200px] lg:h-auto lg:flex-1 lg:min-h-[340px] ${isLoadingOCR
-                ? 'border-blue-300 bg-blue-50/60 animate-pulse cursor-default'
+                ? 'border-blue-300 bg-blue-50/60 animate-pulse'
                 : imageFile
-                  ? 'border-slate-200 bg-slate-50 hover:border-blue-300'
-                  : 'border-slate-300 bg-slate-50 hover:border-[#1e3a5f] hover:bg-blue-50/30'
+                  ? 'border-slate-200 bg-slate-50'
+                  : 'border-dashed border-slate-300 bg-slate-50 hover:border-[#1e3a5f] hover:bg-blue-50/30 cursor-pointer'
               }`}
-            onClick={isLoadingOCR ? undefined : () => fileInputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
+            onClick={isLoadingOCR || imageFile ? undefined : () => fileInputRef.current?.click()}
+            role={isLoadingOCR || imageFile ? undefined : "button"}
+            tabIndex={isLoadingOCR || imageFile ? undefined : 0}
+            onKeyDown={isLoadingOCR || imageFile ? undefined : (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
                 if (!isLoadingOCR) fileInputRef.current?.click()
@@ -1306,42 +1329,34 @@ Return valid JSON only.`
               </div>
             ) : imageFile ? (
               <div className="flex flex-col items-center gap-3 w-full h-full p-3">
-                <img
-                  src={imagePreview}
-                  alt="Xem trước hóa đơn"
-                  className="flex-1 w-full rounded-xl object-contain shadow-md"
-                  style={{ maxHeight: 'calc(100% - 80px)' }}
-                />
-                <div className="flex flex-wrap items-center gap-2 justify-center flex-shrink-0">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-                    onClick={(e) => { e.stopPropagation(); setViewerImage(imagePreview) }}
-                  >
-                    🖼️ Xem đầy đủ
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors shadow-sm"
+                <div className="relative w-full">
+                  <img
+                    src={imagePreview}
+                    alt="Xem trước hóa đơn"
+                    className="w-full h-auto max-h-[320px] object-contain rounded-xl bg-slate-100 mx-auto"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setImageFile(null); setImagePreview(null)
-                      setOcrItems([]); setEditableItems([])
+                      e.preventDefault()
+                      setViewerImage(imagePreview)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute top-3 right-3 z-10 bg-white shadow-md rounded-full p-1.5 text-slate-600 hover:text-red-600 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setImageFile(null)
+                      setImagePreview(null)
+                      setOcrItems([])
+                      setEditableItems([])
                       if (fileInputRef.current) fileInputRef.current.value = ''
                     }}
+                    aria-label="Bỏ ảnh"
                   >
-                    ✕ Bỏ ảnh
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e3a5f] text-white hover:bg-[#16304f] transition-colors shadow-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const file = fileInputRef.current?.files?.[0]
-                      if (file) handleInvoiceUpload(file)
-                    }}
-                  >
-                    🔄 Quét lại
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 1l12 12M13 1L1 13" />
+                    </svg>
                   </button>
                 </div>
               </div>
