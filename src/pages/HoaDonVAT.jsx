@@ -163,8 +163,15 @@ async function compressToDataUrl(file, targetBytes = 500 * 1024) {
   })
 }
 
-async function fileToGenerativePart(file) {
-  const compressed = await resizeAndCompressImage(file)
+async function fileToGenerativePart(fileOrDataUrl) {
+  if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
+    const base64 = fileOrDataUrl.split(',')[1]
+    return {
+      inlineData: { data: base64, mimeType: 'image/jpeg' },
+    }
+  }
+
+  const compressed = await resizeAndCompressImage(fileOrDataUrl)
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onloadend = () => {
@@ -263,21 +270,101 @@ function toTitleCase(text) {
 }
 
 function expandAbbreviations(text) {
-  const upper = String(text || '').toUpperCase()
-  let result = upper
-  Object.entries(abbreviationDictionary)
-    .sort((a, b) => b[0].length - a[0].length)
-    .forEach(([abbr, full]) => {
-      const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      result = result.replace(new RegExp(`\\b${escaped}\\b`, 'g'), full)
-    })
-  return result
+  if (!text) return ''
+  
+  const abbrMap = new Map()
+  Object.entries(abbreviationDictionary).forEach(([abbr, full]) => {
+    abbrMap.set(String(abbr).toUpperCase(), full)
+  })
+
+  const tokens = String(text).split(/\s+/)
+  
+  const expandedTokens = tokens.map(token => {
+    const upperToken = token.toUpperCase()
+    if (abbrMap.has(upperToken)) {
+      return abbrMap.get(upperToken)
+    }
+    
+    // Check for tokens attached to basic punctuation like "TH," or "(TH)"
+    const match = token.match(/^([.,/#!$%^&*;:{}=\-_`~()[\]"']*)(.*?)([.,/#!$%^&*;:{}=\-_`~()[\]"']*)$/)
+    if (match) {
+      const prefix = match[1]
+      const core = match[2]
+      const suffix = match[3]
+      const upperCore = core.toUpperCase()
+      if (upperCore && abbrMap.has(upperCore)) {
+        const full = abbrMap.get(upperCore)
+        if (String(text).toUpperCase().includes(full.toUpperCase())) {
+          return token
+        }
+        return prefix + full + suffix
+      }
+    }
+    
+    return token
+  })
+
+  return expandedTokens.join(' ')
 }
 
 function normalizeProductName(raw) {
   if (!raw) return ''
   const expanded = expandAbbreviations(raw)
-  return toTitleCase(expanded)
+  return capitalizeProductName(expanded)
+}
+
+function normalizeInvoiceDate(rawDate) {
+  if (!rawDate) return ''
+  const str = String(rawDate).trim()
+  let formattedDate = str
+
+  // Add a confidence correction layer
+  const isTextDate = /[a-zA-Záàảãạâấầẩẫậăắằẳẵặđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ]/i.test(str)
+
+  if (isTextDate) {
+    // Only parse Vietnamese text like "11 tháng 6 năm 2026" into: 11/06/2026
+    const matches = str.match(/\d+/g)
+    if (matches && matches.length >= 3) {
+      let [d, m, y] = matches
+      if (y.length === 2) y = '20' + y
+      if (d.length === 4) { const t = d; d = y; y = t; }
+      if (parseInt(m, 10) > 12 && parseInt(d, 10) <= 12) {
+        const temp = d; d = m; m = temp;
+      }
+      formattedDate = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`
+    }
+  } else {
+    // When rawDate is already in numeric format: DD/MM/YYYY is the primary interpretation.
+    const matches = str.match(/\d+/g)
+    if (matches && matches.length >= 3) {
+      let [p1, p2, p3] = matches
+      
+      // YYYY-MM-DD
+      if (p1.length === 4) {
+        formattedDate = `${p3.padStart(2, '0')}/${p2.padStart(2, '0')}/${p1}`
+      } else {
+        // DD/MM/YYYY
+        let d = p1, m = p2, y = p3
+        if (y.length === 2) y = '20' + y
+        
+        let swapped = false
+        // Never swap: 06/11/2026 -> 11/06/2026 unless explicit evidence (m > 12)
+        if (parseInt(m, 10) > 12 && parseInt(d, 10) <= 12) {
+          const temp = d; d = m; m = temp;
+          swapped = true
+        }
+        
+        formattedDate = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`
+        
+        // Debugging console warning
+        if (swapped) {
+          console.warn('Invoice date normalization changed OCR value', str, formattedDate)
+        }
+      }
+    }
+  }
+
+  return formattedDate
 }
 
 // Cập nhật một trường bất kỳ của dòng sản phẩm trong editableItems
@@ -512,7 +599,10 @@ export default function HoaDonVAT() {
   const [editingId, setEditingId] = useState(null)
   const [congTyName, setCongTyName] = useState('')
   const [congTyMst, setCongTyMst] = useState('')
-  const [date, setDate] = useState(formatDateForInput(new Date()))
+  const [date, setDate] = useState(() => {
+    const d = new Date()
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+  })
   const [invoiceSymbol, setInvoiceSymbol] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [groupKey, setGroupKey] = useState(inventory[0]?.id ?? '')
@@ -568,7 +658,8 @@ export default function HoaDonVAT() {
     setAmount(0)
     setImageFile(null)
     setImagePreview(null)
-    setDate(formatDateForInput(new Date()))
+    const d = new Date()
+    setDate(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`)
     setError('')
     setToastMsg('')
     setFormErrors({})
@@ -612,7 +703,7 @@ export default function HoaDonVAT() {
       setImageFile(dataUrl)
       setImagePreview(dataUrl)
       setOcrMessage('')
-      await handleInvoiceUpload(file)
+      await handleInvoiceUpload(dataUrl)
     } catch (err) {
       showError(err.message || 'Không đọc được ảnh. Vui lòng thử lại.')
       setImageFile(null)
@@ -650,7 +741,8 @@ export default function HoaDonVAT() {
     setCongTyName(sellerInfo.company_name || sellerInfo.ten_cong_ty || '')
     setCongTyMst(sellerInfo.tax_code || sellerInfo.ma_so_thue || '')
 
-    const formattedDate = formatToInputDate(invoiceInfo.issue_date || invoiceInfo.ngay_xuat)
+    const rawDate = invoiceInfo.issue_date || invoiceInfo.ngay_xuat
+    const formattedDate = normalizeInvoiceDate(rawDate)
     if (formattedDate) {
       setDate(formattedDate)
     }
@@ -671,7 +763,16 @@ export default function HoaDonVAT() {
     // Bước 4: Làm sạch và lưu items
     const items = cleaned.products || cleaned.danh_sach_hang_hoa || []
     const normalizedItems = cleanAndNormalizeItems(items)
-    saveToProductPriceBook(normalizedItems, invoiceInfo.issue_date || invoiceInfo.ngay_xuat || date, formatDateDisplay)
+    
+    const rawSavedDate = invoiceInfo.issue_date || invoiceInfo.ngay_xuat || date
+    const cleanDdMmYyyy = normalizeInvoiceDate(rawSavedDate)
+    let dbDateApply = cleanDdMmYyyy
+    if (cleanDdMmYyyy && cleanDdMmYyyy.includes('/')) {
+      const parts = cleanDdMmYyyy.split('/')
+      if (parts.length === 3) dbDateApply = `${parts[2]}-${parts[1]}-${parts[0]}`
+    }
+
+    saveToProductPriceBook(normalizedItems, dbDateApply, formatDateDisplay)
     setOcrItems(normalizedItems || [])
     setEditableItems(normalizedItems || [])
   }
@@ -710,7 +811,8 @@ CRITICAL DATA RULES:
    - CASE B (Retail/Sales Invoices like 'Hoa don ban hang' without a separate tax breakdown): Look at the printed 'Đơn giá' and 'Thành tiền' directly on that row since they are already the final gross numbers. If there are any rounding anomalies, verify that Line Total = Quantity x Unit Price.
    - For ALL cases, ensure each row's 'Line Total' represents the true final cost of goods including tax. Sum all these individual line totals to calculate the global 'total_amount'.
    - STRICTLY IGNORE bottom summary rows (Tổng cộng, Tổng tiền thuế, Tổng tiền thanh toán) and NEVER mistake them for actual product lines.
-5. MONETARY CONSTRAINTS (CURRENCY FORMATTING):
+5. INVOICE_DATE_FORMAT: You MUST always extract the invoice date and format it strictly as a clean 'DD/MM/YYYY' string (Example: '15/01/2026'). Never include Vietnamese words like 'Tháng' or 'Năm' inside the JSON response.
+6. MONETARY CONSTRAINTS (CURRENCY FORMATTING):
    - ALL monetary values (Unit Price, Line Total, Total Amount) must be returned as continuous, clean integers representing the exact Vietnamese Dong (VND) value.
    - Absolutely NO dots, NO commas, NO fractional cents, and DO NOT divide by thousands (Example: "84000" instead of "84.000" or "84").
    - EXTRACT ONLY REAL DATA: Do not fabricate, guess, or repeat placeholder values. Empty field = null.
@@ -719,27 +821,25 @@ CLASSIFY INVOICE TYPE:
 - If invoice has Tax ID (MST) and formal serial/number format → invoice_type = 'VAT'
 - If it's a retail receipt without full MST → invoice_type = 'RETAIL'
 
+PRODUCT_NAME_RULE:
+- Extract item_name exactly as printed on the invoice.
+- Preserve original abbreviations.
+- Preserve original spelling.
+- Preserve original casing when possible.
+- Do not expand abbreviations.
+- Do not infer brands.
+- Do not rewrite product descriptions.
+- OCR extraction only.
+
 PRODUCT EXTRACTION RULES:
 - Preserve original unit of measure exactly (Thùng, Lốc, Két, Chai, Bao, Hộp, Lon, Gói, Cái...)
 - If a line is promotional (price=0, name contains K.M/Khuyến mãi/Quà tặng) → row_type: 'KM'
 - For KM lines, extract their exact unit of measure and set product_code to the product code of the matched MUA line above.
-- Translate raw abbreviated product names to clear, readable standard Vietnamese. Clean and filter out rows that are purely discounts.
+- Clean and filter out rows that are purely discounts.
 - For each item in the 'products' array, you must determine the 'row_type':
   - If the item has a price greater than 0, set 'row_type' to 'MUA'.
   - If the item is a promotional gift (the name contains 'K.M', 'KM', 'Khuyến mãi' and the price is 0), set 'row_type' to 'KM'.
   - Strictly use uppercase 'MUA' or 'KM' only, do not use lowercase or other words.
-
-PRODUCT NAME TRANSLATION RULES (MANDATORY):
-You are provided with a reference dictionary of Vietnamese grocery abbreviations. Use it strictly under these rules:
-- ONLY match when the abbreviation stands as a SEPARATE, FULL WORD in the text (e.g., if code is 'KD', match 'Kinh Đô'. Do NOT match inside other words or partial letter groups).
-- If an abbreviation appears ambiguous, use the invoice row context to pick the SINGLE best fitting meaning. NEVER combine multiple meanings into a chaotic sentence.
-- Prioritize making the final product name sound natural, grammatically correct, and polite in Vietnamese. Do not insert dashes or extra punctuation between expanded words.
-- If a word in the product name is NOT in the dictionary below, keep it exactly as it appears on the invoice — do NOT guess or translate it.
-
-Here is the abbreviation dictionary for your reference:
-${Object.entries(abbreviationDictionary)
-          .map(([key, value]) => `  - '${key}' = '${value}'`)
-          .join('\n')}
 
 Return valid JSON only.`
 
@@ -992,6 +1092,14 @@ Return valid JSON only.`
       return
     }
 
+    let dbDate = date
+    if (date.includes('/')) {
+      const parts = date.split('/')
+      if (parts.length === 3) {
+        dbDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+      }
+    }
+
     const selectedGroupId = groupKey || inventory[0]?.id
     if (!selectedGroupId) {
       showError('❌ Vui lòng chọn nhóm hàng.')
@@ -1077,7 +1185,7 @@ Return valid JSON only.`
               if (!fileToUpload) throw new Error('Không chuyển được ảnh sang Blob để upload.')
             }
 
-            const compressedFile = await resizeAndCompressImage(fileToUpload)
+            const compressedFile = fileToUpload
 
             // Đặt tên file độc nhất theo số HĐ + timestamp để tránh trùng đè
             const safeNumber = String(invoiceNumber || '').trim().replace(/[^a-zA-Z0-9]/g, '_') || 'invoice'
@@ -1127,7 +1235,7 @@ Return valid JSON only.`
           invoice_type: invoiceType,
           serial_number: sanitizeForDb(invoiceSymbol),
           invoice_number: sanitizeForDb(invoiceNumber),
-          issue_date: date,
+          issue_date: dbDate,
           total_amount: Number(amount) || 0,
           notes: sanitizeForDb(note),
           supplier_id: supplierId,
@@ -1202,7 +1310,7 @@ Return valid JSON only.`
             .insert([{
               product_id: productId,
               invoice_id: invoiceId,
-              import_date: date,
+              import_date: dbDate,
               unit_price_after_vat: item.unit_price_after_vat,
               quantity: item.so_luong || 0,
               row_type: validatedRowType,
@@ -1216,7 +1324,7 @@ Return valid JSON only.`
         }
 
         if (cleaned.length) {
-          saveToProductPriceBook(cleaned, date, formatDateDisplay)
+          saveToProductPriceBook(cleaned, dbDate, formatDateDisplay)
         }
       } else {
         // Fallback localStorage nếu chưa cấu hình Supabase
@@ -1226,7 +1334,7 @@ Return valid JSON only.`
           invoiceType,
           companyName,
           companyMst,
-          date,
+          date: dbDate,
           invoiceSymbol: invoiceSymbol.trim(),
           invoiceNumber: invoiceNumber.trim(),
           groupKey: selectedGroupId,
@@ -1242,7 +1350,7 @@ Return valid JSON only.`
 
         const cleaned = editableItems
         if (cleaned.length) {
-          saveToProductPriceBook(cleaned, date, formatDateDisplay)
+          saveToProductPriceBook(cleaned, dbDate, formatDateDisplay)
         }
       }
 
@@ -1467,7 +1575,22 @@ Return valid JSON only.`
                         </label>
                         {isLoadingOCR
                           ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
-                          : <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
+                          : (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                placeholder="DD/MM/YYYY"
+                                required
+                                aria-label="Chọn ngày"
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-base text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] hover:border-slate-300 pr-10"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                                📅
+                              </span>
+                            </div>
+                          )
                         }
                       </div>
                     </div>
@@ -1616,7 +1739,22 @@ Return valid JSON only.`
                         </label>
                         {isLoadingOCR
                           ? <div className="h-10 rounded-lg bg-slate-200 animate-pulse" />
-                          : <DatePicker value={date} onChange={setDate} required aria-label="Chọn ngày" />
+                          : (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                placeholder="DD/MM/YYYY"
+                                required
+                                aria-label="Chọn ngày"
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-base text-slate-800 bg-white outline-none transition focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] hover:border-slate-300 pr-10"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                                📅
+                              </span>
+                            </div>
+                          )
                         }
                       </div>
                     </div>
