@@ -705,14 +705,19 @@ CRITICAL DATA RULES:
 1. INVOICE NUMBER EXTRACTION: Look at the upper-right corner for billing number (Số: XXXX). Extract ONLY what is actually printed. If the field is blank or empty on the paper, return null (no quotes). NEVER invent numbers like '6666' for invoices that don't have one.
 2. TAX CODE (Mã số thuế): If not visible or blank, return null (proper JSON null, no quotes). Never write the literal string "null".
 3. INVOICE SERIAL (Ký hiệu): If not printed, return null. Never repeat values from other fields.
-4. MATHEMATICAL INTEGRITY: If 'Thành tiền' column is obscured, calculate: Line Total = Quantity × Unit Price. Sum all line totals for 'total_amount'.
-5. EXTRACT ONLY REAL DATA: Do not fabricate, guess, or repeat placeholder values. Empty field = null.
+4. MATHEMATICAL INTEGRITY - TOTAL PRICE CALCULATIONS:
+   - CASE A (VAT Invoices with separate tax columns): DO NOT extract the raw pre-tax number from the 'Đơn giá' column. Instead, find the final 'Tổng cộng' (Gross Total after tax) column on that specific item row, and the 'Số lượng' (Quantity). Calculate the actual unit price using the formula: Unit Price = Gross Total / Quantity.
+   - CASE B (Retail/Sales Invoices like 'Hoa don ban hang' without a separate tax breakdown): Look at the printed 'Đơn giá' and 'Thành tiền' directly on that row since they are already the final gross numbers. If there are any rounding anomalies, verify that Line Total = Quantity x Unit Price.
+   - For ALL cases, ensure each row's 'Line Total' represents the true final cost of goods including tax. Sum all these individual line totals to calculate the global 'total_amount'.
+   - STRICTLY IGNORE bottom summary rows (Tổng cộng, Tổng tiền thuế, Tổng tiền thanh toán) and NEVER mistake them for actual product lines.
+5. MONETARY CONSTRAINTS (CURRENCY FORMATTING):
+   - ALL monetary values (Unit Price, Line Total, Total Amount) must be returned as continuous, clean integers representing the exact Vietnamese Dong (VND) value.
+   - Absolutely NO dots, NO commas, NO fractional cents, and DO NOT divide by thousands (Example: "84000" instead of "84.000" or "84").
+   - EXTRACT ONLY REAL DATA: Do not fabricate, guess, or repeat placeholder values. Empty field = null.
 
 CLASSIFY INVOICE TYPE:
 - If invoice has Tax ID (MST) and formal serial/number format → invoice_type = 'VAT'
 - If it's a retail receipt without full MST → invoice_type = 'RETAIL'
-
-All monetary values must be returned as continuous integers without dots or commas (Example: '176727' not '176.727'). All prices are in thousands VND (176.727 = 176,727 VND).
 
 PRODUCT EXTRACTION RULES:
 - Preserve original unit of measure exactly (Thùng, Lốc, Két, Chai, Bao, Hộp, Lon, Gói, Cái...)
