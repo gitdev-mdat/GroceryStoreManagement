@@ -199,6 +199,7 @@ export default function TraCuuGia() {
       const { data: historyData, error: historyError } = await supabase
         .from('price_history')
         .select('product_id, import_date, unit_price_after_vat, suggested_retail_price, is_active_price')
+        .gt('unit_price_after_vat', 0)
         .order('import_date', { ascending: false })
       if (historyError) throw historyError
 
@@ -326,7 +327,7 @@ export default function TraCuuGia() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('products').update({ trang_thai: 'INACTIVE' }).eq('id', deleteTarget.id)
+      const { error } = await supabase.from('products').update({ status: 'INACTIVE' }).eq('id', deleteTarget.id)
       if (error) throw error
       setProducts(prev => prev.filter(p => p.id !== deleteTarget.id))
       showToast('Đã ẩn sản phẩm khỏi danh mục.', 'success')
@@ -501,7 +502,10 @@ export default function TraCuuGia() {
 
                   {/* Card Header: Product Name + Trend */}
                   <div className="flex items-start justify-between gap-2 px-4 py-3 bg-slate-50/60 border-b border-slate-100">
-                    <span className="font-bold text-slate-900 text-sm leading-snug flex-1">{item.product_name || '—'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-slate-900 text-sm leading-snug">{item.product_name || '—'}</div>
+                      <div className="text-xs text-slate-400 mt-0.5 tabular-nums">{pd.latest_date ? (() => { const d = new Date(String(pd.latest_date).replace(/\//g, '-') + 'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })() : '—'}</div>
+                    </div>
                     <TrendBadge trend={pd.trend} />
                   </div>
 
@@ -595,11 +599,10 @@ export default function TraCuuGia() {
                       <button
                         type="button"
                         onClick={() => setPage(p)}
-                        className={`min-w-[34px] h-[34px] rounded-lg text-xs font-semibold transition-all ${
-                          p === safePage
+                        className={`min-w-[34px] h-[34px] rounded-lg text-xs font-semibold transition-all ${p === safePage
                             ? 'bg-[#1e3a5f] text-white shadow-sm'
                             : 'border border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         {p}
                       </button>

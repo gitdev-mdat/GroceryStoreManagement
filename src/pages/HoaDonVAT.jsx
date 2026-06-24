@@ -1260,11 +1260,29 @@ Return valid JSON only.`
         const cleaned = editableItems
 
         for (const item of cleaned) {
-          const { data: existingProduct, error: productSelectError } = await supabase
+          const normalizedName = slugify(item.ten_hang)
+
+          let { data: existingProduct, error: productSelectError } = await supabase
             .from('products')
             .select('id')
-            .eq('product_name', item.ten_hang)
+            .eq('normalized_name', normalizedName)
             .limit(1)
+
+          // Fallback check for unmigrated legacy products
+          if (!productSelectError && (!existingProduct || existingProduct.length === 0)) {
+            const fallback = await supabase
+              .from('products')
+              .select('id')
+              .eq('product_name', item.ten_hang)
+              .limit(1)
+            
+            if (fallback.data && fallback.data.length > 0) {
+              existingProduct = fallback.data
+            }
+            if (fallback.error) {
+              productSelectError = fallback.error
+            }
+          }
 
           if (productSelectError) {
             throw new Error(`Không thể kiểm tra sản phẩm "${item.ten_hang}": ${productSelectError.message}`)
@@ -1278,6 +1296,7 @@ Return valid JSON only.`
               .from('products')
               .insert([{
                 product_name: item.ten_hang,
+                normalized_name: normalizedName,
                 unit: item.don_vi_tinh,
                 status: 'ACTIVE',
               }])
