@@ -162,6 +162,7 @@ export default function NhatKyHoaDon() {
   const fetchInvoices = useCallback(async () => {
     if (!isSupabaseConfigured()) { setLoading(false); return }
     setLoading(true)
+    console.log('[DEBUG NhatKyHoaDon] supabase URL:', import.meta.env.VITE_SUPABASE_URL)
     try {
       let q = supabase
         .from('invoices')
@@ -174,12 +175,17 @@ export default function NhatKyHoaDon() {
         const endDate = month === '12'
           ? `${parseInt(year) + 1}-01-01`
           : `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`
+        console.log('[DEBUG NhatKyHoaDon] filterMonth:', filterMonth, '→ startDate:', startDate, 'endDate:', endDate)
         q = q.gte('issue_date', startDate).lt('issue_date', endDate)
       }
       if (filterType === 'VAT') q = q.eq('invoice_type', 'VAT')
       else if (filterType === 'RETAIL') q = q.eq('invoice_type', 'RETAIL')
 
+      console.log('[DEBUG NhatKyHoaDon] filterType:', filterType)
       const { data, error } = await q
+      console.log('[DEBUG NhatKyHoaDon] fetchInvoices returned rows:', data?.length ?? 0)
+      console.log('[DEBUG NhatKyHoaDon] fetchInvoices data:', JSON.stringify(data, null, 2))
+      console.log('[DEBUG NhatKyHoaDon] fetchInvoices error:', JSON.stringify(error, null, 2))
       if (error) throw error
       setInvoices(data || [])
       setPage(0)

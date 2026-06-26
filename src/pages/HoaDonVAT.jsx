@@ -1110,6 +1110,13 @@ Return valid JSON only.`
 
     try {
       const useSupabase = isSupabaseConfigured()
+      console.log('[DEBUG SAVE] isSupabaseConfigured():', useSupabase)
+      console.log('[DEBUG SAVE] VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL)
+      console.log('[DEBUG SAVE] invoiceType:', invoiceType)
+      console.log('[DEBUG SAVE] invoiceNumber:', invoiceNumber)
+      console.log('[DEBUG SAVE] amount:', amount)
+      console.log('[DEBUG SAVE] date (form state):', date)
+      console.log('[DEBUG SAVE] dbDate:', dbDate)
 
       if (useSupabase) {
         // ===========================
@@ -1147,6 +1154,8 @@ Return valid JSON only.`
         // Kiểm tra trùng lặp hóa đơn (theo số HĐ + tổng tiền)
         // ===========================
         const normalizedInvoiceNumber = String(invoiceNumber || '').trim()
+        console.log('[DEBUG DUP CHECK] normalizedInvoiceNumber:', JSON.stringify(normalizedInvoiceNumber))
+        console.log('[DEBUG DUP CHECK] amount:', amount, '→ Number(amount):', Number(amount) || 0)
         if (normalizedInvoiceNumber) {
           const { data: duplicateInvoices, error: duplicateError } = await supabase
             .from('invoices')
@@ -1155,12 +1164,22 @@ Return valid JSON only.`
             .eq('total_amount', Number(amount) || 0)
             .limit(1)
 
+          console.log('[DEBUG DUP CHECK] supabase URL:', import.meta.env.VITE_SUPABASE_URL)
+          console.log('[DEBUG DUP CHECK] duplicateInvoices:', JSON.stringify(duplicateInvoices, null, 2))
+          console.log('[DEBUG DUP CHECK] duplicateError:', JSON.stringify(duplicateError, null, 2))
+
           if (duplicateError) {
             throw new Error(`Không thể kiểm tra trùng lặp hóa đơn: ${duplicateError.message}`)
           }
 
           if (duplicateInvoices && duplicateInvoices.length > 0) {
             const dup = duplicateInvoices[0]
+            console.log('[DEBUG DUP CHECK] MATCH FOUND — triggering duplicate dialog:', {
+              id: dup.id,
+              invoice_number: dup.invoice_number,
+              total_amount: dup.total_amount,
+              issue_date: dup.issue_date,
+            })
             setDuplicateInvoice({
               invoice_number: dup.invoice_number,
               total_amount: dup.total_amount,
@@ -1169,6 +1188,8 @@ Return valid JSON only.`
             })
             setIsSaving(false)
             return
+          } else {
+            console.log('[DEBUG DUP CHECK] No duplicate found — proceeding to insert.')
           }
         }
 
@@ -1242,17 +1263,23 @@ Return valid JSON only.`
           image_url: uploadedImageUrl,
         }
 
+        console.log('[DEBUG INSERT] invoicePayload:', JSON.stringify(invoicePayload, null, 2))
+
         const { data: newInvoice, error: invoiceInsertError } = await supabase
           .from('invoices')
           .insert([invoicePayload])
           .select()
           .single()
 
+        console.log('[DEBUG INSERT] newInvoice:', JSON.stringify(newInvoice, null, 2))
+        console.log('[DEBUG INSERT] invoiceInsertError:', JSON.stringify(invoiceInsertError, null, 2))
+
         if (invoiceInsertError) {
           throw new Error(`Không thể lưu hóa đơn: ${invoiceInsertError.message}`)
         }
 
         const invoiceId = newInvoice.id
+        console.log('[DEBUG INSERT] saved with invoiceId:', invoiceId)
 
         // ===========================
         // Bước 3: Lưu sản phẩm & lịch sử giá (dùng editableItems — đã bao gồm chỉnh sửa của user)
@@ -1260,29 +1287,11 @@ Return valid JSON only.`
         const cleaned = editableItems
 
         for (const item of cleaned) {
-          const normalizedName = slugify(item.ten_hang)
-
-          let { data: existingProduct, error: productSelectError } = await supabase
+          const { data: existingProduct, error: productSelectError } = await supabase
             .from('products')
             .select('id')
-            .eq('normalized_name', normalizedName)
+            .eq('product_name', item.ten_hang)
             .limit(1)
-
-          // Fallback check for unmigrated legacy products
-          if (!productSelectError && (!existingProduct || existingProduct.length === 0)) {
-            const fallback = await supabase
-              .from('products')
-              .select('id')
-              .eq('product_name', item.ten_hang)
-              .limit(1)
-            
-            if (fallback.data && fallback.data.length > 0) {
-              existingProduct = fallback.data
-            }
-            if (fallback.error) {
-              productSelectError = fallback.error
-            }
-          }
 
           if (productSelectError) {
             throw new Error(`Không thể kiểm tra sản phẩm "${item.ten_hang}": ${productSelectError.message}`)
@@ -1296,7 +1305,6 @@ Return valid JSON only.`
               .from('products')
               .insert([{
                 product_name: item.ten_hang,
-                normalized_name: normalizedName,
                 unit: item.don_vi_tinh,
                 status: 'ACTIVE',
               }])
@@ -2097,10 +2105,16 @@ Return valid JSON only.`
               image_url: uploadedImageUrl,
             }
 
+            console.log('[DEBUG DUP CONFIRM] invoicePayload:', JSON.stringify(invoicePayload, null, 2))
+            console.log('[DEBUG DUP CONFIRM] note: date state is', date, '← DD/MM/YYYY string')
+
             const { data: newInvoice, error: invoiceInsertError } = await supabase.from('invoices').insert([invoicePayload]).select().single()
+            console.log('[DEBUG DUP CONFIRM] newInvoice:', JSON.stringify(newInvoice, null, 2))
+            console.log('[DEBUG DUP CONFIRM] invoiceInsertError:', JSON.stringify(invoiceInsertError, null, 2))
             if (invoiceInsertError) throw new Error(`Không thể lưu hóa đơn: ${invoiceInsertError.message}`)
 
             const invoiceId = newInvoice.id
+            console.log('[DEBUG DUP CONFIRM] saved with invoiceId:', invoiceId)
             const cleaned = editableItems
             for (const item of cleaned) {
               const { data: existingProduct } = await supabase.from('products').select('id').eq('product_name', item.ten_hang).limit(1)
