@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff, User, Lock, Mail, Check } from 'lucide-react'
-
-// ── Hardcoded credentials ─────────────────────────────────────────────────────
-const VALID_USERNAMES = ['admin', 'admin@gmail.com']
-const VALID_PASSWORD = '123456'
+import { useAuth } from '../context/AuthContext'
 
 // ── Branding Panel — Left Side ────────────────────────────────────────────────
 function BrandPanel() {
@@ -177,7 +174,8 @@ function ErrorAlert({ message }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function LoginPage({ onLogin }) {
+export default function LoginPage() {
+  const { signIn } = useAuth()
   const [mode, setMode] = useState('login')
   const [showPass, setShowPass] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -192,37 +190,45 @@ export default function LoginPage({ onLogin }) {
 
   const isLogin = mode === 'login'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
     if (isLogin) {
-      // ── Hardcoded auth check — accepts "admin" OR "admin@gmail.com" ──
-      if (VALID_USERNAMES.includes(email.trim()) && password === VALID_PASSWORD) {
-        setLoading(true)
-        setTimeout(() => {
-          setLoading(false)
-          if (onLogin) onLogin()
-        }, 700)
-      } else {
-        setError('Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại.')
+      // ── Real Supabase authentication ────────────────────────────────
+      if (!email.trim()) { setError('Vui lòng nhập email.'); return }
+      if (!password) { setError('Vui lòng nhập mật khẩu.'); return }
+
+      setLoading(true)
+      try {
+        const result = await signIn(email.trim(), password)
+        if (result?.error) {
+          const errMsg = result.error.message || '';
+          if (errMsg.includes('Invalid login credentials') || errMsg.includes('Email không tồn tại')) {
+            setError('Email hoặc mật khẩu không đúng.');
+          } else if (errMsg.includes('inactive') || errMsg.includes('khóa')) {
+            setError('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.');
+          } else if (errMsg.includes('Failed to fetch') || errMsg.includes('Network')) {
+            setError('Không thể kết nối máy chủ. Vui lòng thử lại.');
+          } else {
+            setError('Email hoặc mật khẩu không đúng.');
+          }
+        }
+        // On success, AuthContext updates `user` → App re-renders to Dashboard
+      } catch (err) {
+        setError('Không thể kết nối máy chủ. Vui lòng thử lại.')
+      } finally {
+        setLoading(false)
       }
     } else {
-      // Register: just simulate success
+      // ── Registration is disabled ────────────────────────────────────
+      // Employee accounts are created by ADMINs only.
+      // Contact your administrator to create an account.
       if (!fullName.trim()) { setError('Vui lòng nhập họ và tên.'); return }
       if (!email.trim()) { setError('Vui lòng nhập email.'); return }
       if (password.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự.'); return }
       if (password !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return }
-      setLoading(true)
-      setTimeout(() => {
-        setLoading(false)
-        setMode('login')
-        setError('')
-        setEmail('')
-        setPassword('')
-        setConfirmPassword('')
-        setFullName('')
-      }, 900)
+      setError('Tài khoản nhân viên được tạo bởi Quản trị viên. Vui lòng liên hệ ADMIN.')
     }
   }
 
@@ -278,7 +284,7 @@ export default function LoginPage({ onLogin }) {
 
             <FormInput id="email" label="Tên đăng nhập / Email" type="text"
               value={email} onChange={(e) => { setEmail(e.target.value); setError('') }}
-              placeholder={isLogin ? 'admin hoặc admin@gmail.com' : 'email@example.com'}
+              placeholder={isLogin ? 'email@example.com' : 'email@example.com'}
               icon={isLogin ? User : Mail} disabled={loading} />
 
             <FormInput id="password" label="Mật khẩu"
@@ -333,16 +339,10 @@ export default function LoginPage({ onLogin }) {
               </p>
             )}
 
-            {/* Hint for test account — login only */}
+            {/* Hint for test account */}
             {isLogin && (
               <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 leading-relaxed">
-                💡 Tài khoản thử:{' '}
-                <span className="font-mono font-semibold text-slate-600">admin</span>
-                {' '}hoặc{' '}
-                <span className="font-mono font-semibold text-slate-600">admin@gmail.com</span>
-                {' '}·{' '}
-                mật khẩu:{' '}
-                <span className="font-mono font-semibold text-slate-600">123456</span>
+                💡 Tài khoản thử nghiệm: liên hệ Quản trị viên để tạo tài khoản.
               </p>
             )}
 

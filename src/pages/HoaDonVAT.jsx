@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { VAT_IMAGE_MAX_SIZE } from '../data/constants'
 import { formatVndExact } from '../components/FormatNumber'
 import VndInput from '../components/VndInput'
@@ -596,6 +597,7 @@ function roundUpToThousands(value) {
 
 export default function HoaDonVAT() {
   const { inventory, vatInvoices, addVatInvoice, updateVatInvoice, deleteVatInvoice, companies, addCompany } = useApp()
+  const { user } = useAuth()
   const [editingId, setEditingId] = useState(null)
   const [congTyName, setCongTyName] = useState('')
   const [congTyMst, setCongTyMst] = useState('')
@@ -1261,6 +1263,7 @@ Return valid JSON only.`
           notes: sanitizeForDb(note),
           supplier_id: supplierId,
           image_url: uploadedImageUrl,
+          created_by: user?.id ?? null,
         }
 
         console.log('[DEBUG INSERT] invoicePayload:', JSON.stringify(invoicePayload, null, 2))
@@ -2103,6 +2106,7 @@ Return valid JSON only.`
               notes: sanitizeForDb(note),
               supplier_id: isRetailInvoice ? null : supplierId,
               image_url: uploadedImageUrl,
+              created_by: user?.id ?? null,
             }
 
             console.log('[DEBUG DUP CONFIRM] invoicePayload:', JSON.stringify(invoicePayload, null, 2))
