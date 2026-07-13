@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useApp } from '../../context/AppContext'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { formatVnd } from '../FormatNumber'
 import { formatDateDisplay } from '../FormatDate'
 import { ArrowLeft, ChevronDown, ChevronRight, ChevronLeft, ReceiptText, Pencil, Trash2, Loader2, AlertTriangle, X } from 'lucide-react'
+
+const getFallbackNotes = (dateString) => {
+  if (!dateString) return ''
+  const [y, m, d] = dateString.split('-')
+  const formatted = `${d}/${m}/${y}`
+  return `Doanh thu bán lẻ tạp hóa ngày ${formatted} theo bảng kê ngày ${formatted}`
+}
 
 /* ─────────────────────────────────────────────
    Edit Modal — inline edit via popover
@@ -13,8 +21,9 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
   const [amountDisplay, setAmountDisplay] = useState(
     ticket.total_amount ? Number(ticket.total_amount).toLocaleString('vi-VN') : ''
   )
-  const [dienGiai, setDienGiai] = useState(ticket.notes || '')
   const [errors, setErrors] = useState({})
+
+  const autoNotes = getFallbackNotes(date)
 
   const handleAmountChange = (e) => {
     const raw = e.target.value.replace(/\D/g, '')
@@ -31,7 +40,7 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
     if (!amountRaw || amount <= 0) newErrors.amount = 'Vui lòng nhập số tiền hợp lệ'
     if (!date) newErrors.date = 'Vui lòng chọn ngày'
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
-    onSave({ ...ticket, sale_date: date, total_amount: amount, notes: dienGiai })
+    onSave({ ...ticket, sale_date: date, total_amount: amount, notes: autoNotes })
   }
 
   return (
@@ -48,7 +57,7 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
       " style={{ animation: 'modal-pop 0.25s cubic-bezier(0.34,1.56,0.64,1)' }}>
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900">Sửa phiếu doanh thu</h3>
+          <h3 className="text-lg font-bold text-slate-900">Sửa doanh thu</h3>
           <button
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
@@ -57,19 +66,15 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
           </button>
         </div>
 
-        {/* Ticket number badge and Delete link */}
-        <div className="mb-5 flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Mã phiếu:</span>
-            <span className="text-xs font-bold text-slate-700">{ticket.ticket_number || '—'}</span>
-          </div>
+        {/* Delete link */}
+        <div className="mb-5 flex items-center justify-end">
           <button
             type="button"
             onClick={onDeleteRequest}
             className="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-none"
           >
             <Trash2 size={14} strokeWidth={2.5} />
-            <span>Xóa phiếu</span>
+            <span>Xóa doanh thu</span>
           </button>
         </div>
 
@@ -126,19 +131,12 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
         {/* Description field */}
         <div className="mb-6">
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Diễn giải</label>
-          <textarea
-            rows={3}
-            value={dienGiai}
-            onChange={(e) => setDienGiai(e.target.value)}
-            placeholder="Nhập diễn giải..."
-            className="
-              w-full resize-none rounded-xl border border-slate-200 bg-slate-50
-              px-3.5 py-3 text-sm leading-relaxed text-slate-800
-              placeholder:text-slate-300 transition-all duration-150
-              hover:border-slate-300 hover:bg-white
-              focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100
-            "
-          />
+          <div className="
+            w-full resize-none rounded-xl border border-slate-200 bg-slate-50
+            px-3.5 py-3 text-sm leading-relaxed text-slate-600 cursor-not-allowed
+          ">
+            {autoNotes}
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -198,7 +196,11 @@ function EditTicketModal({ ticket, onClose, onSave, onDeleteRequest, isSaving })
 /* ─────────────────────────────────────────────
    Delete Confirmation Modal
 ───────────────────────────────────────────── */
-function DeleteConfirmModal({ ticketId, onCancel, onConfirm, isDeleting }) {
+function DeleteConfirmModal({ ticket, onCancel, onConfirm, isDeleting }) {
+  const formattedDate = ticket?.sale_date ? (
+    `${ticket.sale_date.split('-')[2]}/${ticket.sale_date.split('-')[1]}/${ticket.sale_date.split('-')[0]}`
+  ) : ''
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -221,12 +223,12 @@ function DeleteConfirmModal({ ticketId, onCancel, onConfirm, isDeleting }) {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-50">
               <AlertTriangle size={20} strokeWidth={2} className="text-rose-500" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Xác nhận xóa phiếu</h3>
+            <h3 className="text-lg font-bold text-slate-900">Xác nhận xóa doanh thu</h3>
           </div>
 
           {/* Content */}
           <p className="mb-6 text-sm leading-relaxed text-slate-600">
-            Bạn có chắc chắn muốn xóa phiếu doanh thu này không? Hành động này sẽ xóa vĩnh viễn dữ liệu và không thể hoàn tác.
+            Xóa doanh thu ngày {formattedDate}? Hành động này sẽ xóa vĩnh viễn dữ liệu và không thể hoàn tác.
           </p>
 
           {/* Footer buttons */}
@@ -312,6 +314,7 @@ function CardSkeleton() {
    Main component — data logic UNCHANGED
 ───────────────────────────────────────────── */
 export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
+  const { isPeriodClosed } = useApp()
   const [loading, setLoading] = useState(false)
   const [allTickets, setAllTickets] = useState([])
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
@@ -343,8 +346,35 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
       onNotify?.({ type: 'error', text: 'Chưa kết nối Supabase.' })
       return
     }
+
+    if (isPeriodClosed?.(editingTicket.sale_date)) {
+      setToast({ show: true, message: 'Kỳ của doanh thu gốc đã chốt sổ. Không thể sửa.', type: 'error' })
+      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+      return
+    }
+    if (isPeriodClosed?.(updatedTicket.sale_date)) {
+      setToast({ show: true, message: 'Ngày mới thuộc kỳ đã chốt sổ. Không thể lưu.', type: 'error' })
+      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+      return
+    }
+
     setIsSaving(true)
     try {
+      // Check uniqueness if date changed
+      if (updatedTicket.sale_date !== editingTicket.sale_date) {
+        const { data: existingData } = await supabase
+          .from('sales_tickets')
+          .select('id')
+          .eq('sale_date', updatedTicket.sale_date)
+          .maybeSingle()
+        if (existingData) {
+          setToast({ show: true, message: `Ngày ${formatDateDisplay(updatedTicket.sale_date)} đã có dữ liệu. Không thể ghi đè.`, type: 'error' })
+          setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+          setIsSaving(false)
+          return
+        }
+      }
+
       const { error } = await supabase
         .from('sales_tickets')
         .update({
@@ -361,17 +391,17 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
         prev.map(t => t.id === updatedTicket.id ? { ...t, ...updatedTicket } : t)
       )
       setEditingTicket(null)
-      setToast({ show: true, message: 'Cập nhật phiếu doanh thu thành công!', type: 'success' })
+      setToast({ show: true, message: 'Cập nhật doanh thu thành công!', type: 'success' })
       setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
       onRefresh?.()
     } catch (err) {
-      console.error('Lỗi cập nhật phiếu:', err)
-      setToast({ show: true, message: 'Cập nhật thất bại. Vui lòng thử lại.', type: 'error' })
+      console.error('Lỗi cập nhật doanh thu:', err)
+      setToast({ show: true, message: 'Cập nhật doanh thu thất bại. Vui lòng thử lại.', type: 'error' })
       setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
     } finally {
       setIsSaving(false)
     }
-  }, [onNotify, onRefresh])
+  }, [onNotify, onRefresh, editingTicket, isPeriodClosed])
 
   // ── Delete: open confirmation modal ──
   const handleDelete = useCallback((ticketId) => {
@@ -387,6 +417,16 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
       onNotify?.({ type: 'error', text: 'Chưa kết nối Supabase.' })
       return
     }
+
+    const ticketToDelete = allTickets.find(t => t.id === pendingDeleteId)
+    if (ticketToDelete && isPeriodClosed?.(ticketToDelete.sale_date)) {
+      setToast({ show: true, message: 'Kỳ này đã chốt sổ. Không thể xóa.', type: 'error' })
+      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+      setIsDeleteModalOpen(false)
+      setPendingDeleteId(null)
+      return
+    }
+
     setIsDeleting(true)
     try {
       const { error } = await supabase
@@ -400,18 +440,18 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
       setIsDeleteModalOpen(false)
       setPendingDeleteId(null)
       setEditingTicket(null)
-      setToast({ show: true, message: 'Xóa phiếu doanh thu thành công!', type: 'success' })
+      setToast({ show: true, message: 'Xóa doanh thu thành công!', type: 'success' })
       setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
       onRefresh?.()
     } catch (err) {
-      console.error('Lỗi xóa phiếu:', err)
+      console.error('Lỗi xóa doanh thu:', err)
       setIsDeleteModalOpen(false)
-      setToast({ show: true, message: 'Xóa phiếu thất bại. Vui lòng thử lại.', type: 'error' })
+      setToast({ show: true, message: 'Xóa doanh thu thất bại. Vui lòng thử lại.', type: 'error' })
       setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
     } finally {
       setIsDeleting(false)
     }
-  }, [pendingDeleteId, onNotify, onRefresh])
+  }, [pendingDeleteId, onNotify, onRefresh, allTickets, isPeriodClosed])
   const fetchAvailableMonths = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       setAvailableMonths([])
@@ -551,10 +591,10 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
         </div>
         <div className="pt-0.5">
           <h2 className="m-0 text-xl font-bold leading-snug text-slate-900">
-            Danh sách phiếu
+            Danh sách doanh thu
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Xem và quản lý các phiếu doanh thu
+            Xem và quản lý doanh thu
           </p>
         </div>
       </div>
@@ -572,7 +612,7 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
               {totalTickets}
             </span>
             <span className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Phiếu phát sinh
+              Ngày có dữ liệu
             </span>
           </div>
 
@@ -674,7 +714,7 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
             <ReceiptText size={22} strokeWidth={1.5} className="text-slate-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-600">Không có phiếu nào</p>
+            <p className="text-sm font-semibold text-slate-600">Chưa có doanh thu nào</p>
             <p className="mt-0.5 text-xs text-slate-400">
               {isSupabaseConfigured()
                 ? 'Chưa có dữ liệu trong kỳ này.'
@@ -717,7 +757,7 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
                     {/* Edit button */}
                     <button
                       type="button"
-                      title="Sửa phiếu"
+                      title="Sửa"
                       onClick={() => handleEdit(ticket)}
                       className="
                         flex h-8 w-8 items-center justify-center rounded-lg
@@ -732,7 +772,7 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
                     {/* Delete button */}
                     <button
                       type="button"
-                      title="Xóa phiếu"
+                      title="Xóa"
                       onClick={() => handleDelete(ticket.id)}
                       disabled={isDeleting}
                       className="
@@ -749,17 +789,12 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
                 </div>
               </div>
 
-              {/* ── Sub-row: ticket ID ── */}
-              <p className="mt-0.5 text-[11px] font-medium tracking-wide text-slate-400">
-                Mã phiếu: {ticket.ticket_number || '—'}
-              </p>
-
               {/* ── Divider ── */}
               <div className="my-3 h-px bg-slate-100" />
 
               {/* ── Description ── */}
               <p className="text-sm leading-relaxed text-slate-600 break-words">
-                {ticket.notes || '—'}
+                {ticket.notes || getFallbackNotes(ticket.sale_date)}
               </p>
             </div>
           ))}
@@ -842,7 +877,7 @@ export default function S1AList({ onBack, onNotify, onRefresh, onEdit }) {
       ══════════════════════════════════════ */}
       {isDeleteModalOpen && (
         <DeleteConfirmModal
-          ticketId={pendingDeleteId}
+          ticket={allTickets.find(t => t.id === pendingDeleteId)}
           onCancel={() => { setIsDeleteModalOpen(false); setPendingDeleteId(null) }}
           onConfirm={confirmDelete}
           isDeleting={isDeleting}

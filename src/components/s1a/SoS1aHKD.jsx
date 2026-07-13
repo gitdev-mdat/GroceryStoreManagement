@@ -36,9 +36,8 @@ function PeriodSheet({ month, year, onSelect, onClose }) {
     <>
       {/* Overlay — mờ dần vào */}
       <div
-        className={`fixed inset-0 bg-black/50 z-40 print:hidden transition-opacity duration-300 ${
-          isVisible ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`fixed inset-0 bg-black/50 z-40 s1a-screen-only transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'
+          }`}
         onClick={handleClose}
         aria-hidden="true"
       />
@@ -48,9 +47,8 @@ function PeriodSheet({ month, year, onSelect, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-label="Chọn kỳ kê khai"
-        className={`fixed bottom-0 left-0 right-0 z-50 print:hidden transition-transform duration-300 ease-out ${
-          isVisible ? 'translate-y-0' : 'translate-y-full'
-        }`}
+        className={`fixed bottom-0 left-0 right-0 z-50 s1a-screen-only transition-transform duration-300 ease-out ${isVisible ? 'translate-y-0' : 'translate-y-full'
+          }`}
       >
         <div className="bg-white rounded-t-3xl shadow-2xl px-4 pb-8 pt-3 max-w-[500px] mx-auto">
           {/* Drag handle — "Thanh xám nhỏ vuốt xuống" */}
@@ -106,11 +104,10 @@ function PeriodSheet({ month, year, onSelect, onClose }) {
                   type="button"
                   aria-pressed={isActive}
                   onClick={() => setTempMonth(m)}
-                  className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 select-none ${
-                    isActive
+                  className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 select-none ${isActive
                       ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 ring-2 ring-brand-400'
                       : 'bg-gray-50 text-gray-700 hover:bg-brand-50 hover:text-brand-700'
-                  }`}
+                    }`}
                 >
                   {label}
                 </button>
@@ -240,7 +237,7 @@ export default function SoS1aHKD({ onBack }) {
       {/* ═══════════════════════════════════════════════════
           TOP BAR — Navigation + Branding + Actions
       ═══════════════════════════════════════════════════ */}
-      <div className="bg-white border-b border-gray-200 print:hidden">
+      <div className="bg-white border-b border-gray-200 s1a-screen-only">
         <div className="px-4 py-3">
           {/* Row 1: Back + Title (Left) | Month Selector (Right) */}
           <div className="flex justify-between items-center gap-3 w-full mb-3">
@@ -294,60 +291,56 @@ export default function SoS1aHKD({ onBack }) {
       {/* ═══════════════════════════════════════════════════
           TỜ GIẤY A4 — Card giấy in nổi bật
       ═══════════════════════════════════════════════════ */}
-      <div className="px-4 py-4">
-        <div className="w-full max-w-[500px] mx-auto bg-white p-4 rounded-xl shadow-md border border-gray-200/60">
+      <div className="px-4 py-4 s1a-print-outer">
+        <div id="s1a-print-document" className="s1a-print-document w-full max-w-[500px] mx-auto bg-white p-4 rounded-xl shadow-md border border-gray-200/60">
           {/* ── Header: Hộ kinh doanh (Cân đối 2 cột) ─────── */}
-          <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-300">
-            {/* Cột trái — Thông tin HKD */}
-            <div className="w-3/5 min-w-0 space-y-1">
-              {/* Dòng 1: Hộ Kinh Doanh */}
-              <p className="text-xs">
+          <div className="s1a-doc-header flex justify-between items-start mb-3 pb-3 s1a-hdr-divider">
+            {/* Cột trái — Thông tin HKD (~70%) */}
+            <div className="s1a-hdr-left w-[70%] min-w-0 space-y-1">
+              {/* Hộ Kinh Doanh */}
+              <p className="s1a-hkd-name text-xs">
                 <span className="font-bold uppercase tracking-wide text-gray-500">Hộ, Cá nhân KD: </span>
                 <span className="text-sm font-bold text-gray-900">{business.business_name}</span>
               </p>
-              {/* Dòng 2: Địa chỉ + MST cùng hàng */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
-                <span className="font-medium text-gray-500 whitespace-nowrap shrink-0">Địa chỉ: </span>
+              {/* Địa chỉ */}
+              <p className="s1a-hkd-meta text-xs text-gray-600">
+                <span className="font-medium text-gray-500">Địa chỉ: </span>
                 <span className="text-gray-700">{business.address}</span>
-                <span className="font-medium text-gray-500 shrink-0">MST:</span>
-                <span className="font-mono font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                  {business.tax_code}
-                </span>
-              </div>
+              </p>
+              {/* Mã số thuế — clean inline, no badge chip */}
+              <p className="s1a-hkd-meta text-xs text-gray-600">
+                <span className="font-medium text-gray-500">Mã số thuế: </span>
+                <span className="s1a-tax-code text-gray-700">{business.tax_code}</span>
+              </p>
             </div>
 
-            {/* Cột phải — Mẫu số */}
-            <div className="w-2/5 text-right shrink-0 pl-4">
+            {/* Cột phải — Mẫu số (~30%) */}
+            <div className="s1a-hdr-right w-[30%] text-right shrink-0 pl-4">
               <p className="text-sm font-bold text-gray-800">Mẫu số S1a-HKD</p>
               <p className="text-xs text-gray-400 mt-0.5">Thông tư 152/2021/TT-BTC</p>
             </div>
           </div>
 
           {/* ── Tiêu đề chính ──────────────────────── */}
-          <div className="text-center mb-4">
-            <h3 className="text-sm font-bold text-gray-900 tracking-tight">
+          <div className="s1a-doc-title text-center mb-3">
+            <h3 className="s1a-title text-sm font-bold text-gray-900 tracking-tight">
               SỔ DOANH THU BÁN HÀNG HOÁ, DỊCH VỤ
             </h3>
-            <p className="text-sm text-gray-600 mt-1.5">
+            <p className="s1a-period text-sm text-gray-600 mt-1">
               Kỳ kê khai: <strong>{kkText}</strong>
             </p>
           </div>
 
-          
+
 
           {/* ── 2a. Bảng PREVIEW (screen only — bị ẩn khi in) ── */}
-          <div className="overflow-x-auto border border-gray-800 rounded print:hidden">
+          <div className="s1a-preview-table s1a-screen-only overflow-x-auto border border-gray-800 rounded mt-3">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border border-gray-800 px-2 py-2 font-semibold text-center w-[25%] whitespace-nowrap">Ngày tháng</th>
                   <th className="border border-gray-800 px-2 py-2 font-semibold text-left w-[50%]">Diễn giải</th>
                   <th className="border border-gray-800 px-2 py-2 font-semibold text-right w-[25%]">Số tiền</th>
-                </tr>
-                <tr className="bg-white">
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs text-center">A</th>
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs">B</th>
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs text-right">1</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,18 +376,13 @@ export default function SoS1aHKD({ onBack }) {
           </div>
 
           {/* ── 2b. Bảng PRINT FULL (ẩn trên screen, hiện khi in) ── */}
-          <div className="hidden print:block overflow-x-auto border border-gray-800 rounded">
-            <table className="w-full border-collapse text-xs">
+          <div className="s1a-print-table hidden overflow-x-auto border border-gray-800 rounded mt-3">
+            <table className="w-full border-collapse text-xs s1a-print-table-el">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border border-gray-800 px-2 py-2 font-semibold text-center w-[25%] whitespace-nowrap">Ngày tháng</th>
-                  <th className="border border-gray-800 px-2 py-2 font-semibold text-left w-[50%]">Diễn giải</th>
-                  <th className="border border-gray-800 px-2 py-2 font-semibold text-right w-[25%]">Số tiền</th>
-                </tr>
-                <tr className="bg-white">
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs text-center">A</th>
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs">B</th>
-                  <th className="border border-gray-800 px-2 py-1 font-normal italic text-gray-500 text-xs text-right">1</th>
+                  <th className="s1a-th-date border border-gray-800 px-2 py-2 font-semibold text-center whitespace-nowrap">Ngày tháng</th>
+                  <th className="s1a-th-dien-giai border border-gray-800 px-2 py-2 font-semibold text-left">Diễn giải</th>
+                  <th className="s1a-th-amount border border-gray-800 px-2 py-2 font-semibold text-right whitespace-nowrap">Số tiền</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,7 +390,7 @@ export default function SoS1aHKD({ onBack }) {
                   <tr key={index}>
                     <td className="border border-gray-800 px-2 py-2 text-center whitespace-nowrap text-gray-800 align-middle">{row.date}</td>
                     <td className="border border-gray-800 px-2 py-2 text-gray-700 align-middle">{row.dienGiai}</td>
-                    <td className="border border-gray-800 px-2 py-2 text-right whitespace-nowrap align-middle">
+                    <td className="s1a-td-amount border border-gray-800 px-2 py-2 text-right whitespace-nowrap align-middle">
                       <span className="text-slate-800 font-semibold">{formatVnd(row.amount)}</span>
                     </td>
                   </tr>
@@ -411,7 +399,7 @@ export default function SoS1aHKD({ onBack }) {
               <tfoot>
                 <tr className="bg-amber-50 border-t-2 border-gray-800">
                   <td colSpan={2} className="border border-gray-800 px-2 py-2.5 font-bold text-sm">TỔNG</td>
-                  <td className="border border-gray-800 px-2 py-2.5 text-right whitespace-nowrap">
+                  <td className="s1a-td-amount border border-gray-800 px-2 py-2.5 text-right whitespace-nowrap">
                     <span className="text-slate-900 font-bold text-sm">{formatVnd(grandTotal)}</span>
                   </td>
                 </tr>
@@ -421,7 +409,7 @@ export default function SoS1aHKD({ onBack }) {
 
           {/* ── 2c. Preview note (screen only) ── */}
           {isLimited && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5 print:hidden">
+            <div className="s1a-screen-only mt-3 flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-px shrink-0 text-brand-600">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="8" />
@@ -433,15 +421,20 @@ export default function SoS1aHKD({ onBack }) {
             </div>
           )}
 
-          {/* ── Footer ký tên ───────────────────────── */}
-          <div className="mt-5 text-right">
-            <p className="text-sm text-gray-600 mb-1">Ngày 30 tháng {String(month).padStart(2, '0')} năm {year}</p>
-            <p className="text-sm font-semibold text-gray-800 mb-0.5">NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</p>
-            <p className="text-xs text-gray-400 italic">(Ký, họ tên và đóng dấu (nếu có))</p>
+          {/* ── Footer ký tên — structured 2-column ─────────── */}
+          <div className="s1a-signature-block flex mt-6">
+            {/* Left spacer (~52%) */}
+            <div className="w-[52%]"></div>
+            {/* Right signature column (~48%) */}
+            <div className="s1a-signature w-[48%] text-center">
+              <p className="text-sm text-gray-600 mb-5">Ngày 30 tháng {String(month).padStart(2, '0')} năm {year}</p>
+              <p className="text-sm font-semibold text-gray-800 mb-0.5">NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</p>
+              <p className="text-xs text-gray-400 italic">(Ký, họ tên và đóng dấu nếu có)</p>
+            </div>
           </div>
 
           {/* ── Watermark Preview ─────────────────────── */}
-          <div className="mt-5 pt-4 border-t border-dashed border-gray-200 flex justify-center print:hidden">
+          <div className="s1a-screen-only mt-5 pt-4 border-t border-dashed border-gray-200 flex justify-center">
             <span className="text-xs text-gray-400 italic">— Bản xem trước mẫu in —</span>
           </div>
         </div>
@@ -464,27 +457,290 @@ export default function SoS1aHKD({ onBack }) {
       ═══════════════════════════════════════════════════ */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print\\:shadow-none,
-          .print\\:shadow-none * { visibility: visible; }
-          .print\\:shadow-none {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            border: 1px solid #000 !important;
+          /* ── 1. Rescue: document and all children visible ── */
+          #s1a-print-document {
+            visibility: visible !important;
           }
-          .print\\:hidden { display: none !important; }
-          .min-h-screen { min-height: auto !important; }
-          .bg-slate-100, .bg-gray-100 { background: white !important; }
-          .bg-white { background: white !important; }
-          .bg-gray-100 { background: #f5f5f5 !important; }
-          .bg-amber-50 { background: #fffbeb !important; }
-          .text-green-600 { color: #15803d !important; }
-          .text-blue-700 { color: #1d4ed8 !important; }
-          .border-gray-800 { border-color: #000 !important; }
-          .overflow-x-auto { overflow: visible !important; }
-          @page { size: A4 portrait; margin: 10mm; }
+          #s1a-print-document * {
+            visibility: visible !important;
+          }
+
+          /* ── 2. Outer padding wrapper — reset to full width, no padding ── */
+          .s1a-print-outer {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
+          /* ── 3. Document block — full A4 width ── */
+          #s1a-print-document {
+            display: block !important;
+            visibility: visible !important;
+            position: static !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background-color: #ffffff !important;
+          }
+
+          /* ── 4. All children visible ── */
+          #s1a-print-document * {
+            visibility: visible !important;
+          }
+
+          /* ── 5. Hide only actual screen-only UI controls ── */
+          .s1a-screen-only {
+            display: none !important;
+          }
+
+          /* ── 6. Show/hide the correct table ── */
+          .s1a-preview-table {
+            display: none !important;
+          }
+          .s1a-print-table {
+            display: table !important;
+          }
+
+          /* ══════════════════════════════════════════
+             LAYOUT POLISH — PRINT ONLY
+          ══════════════════════════════════════════ */
+
+          /* ── 7. HEADER: two-column proportions 70/30 ── */
+          #s1a-print-document .s1a-doc-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+          }
+          #s1a-print-document .s1a-hdr-left {
+            width: 70% !important;
+          }
+          #s1a-print-document .s1a-hdr-right {
+            width: 30% !important;
+            text-align: right !important;
+          }
+
+          /* Header divider: clean 1pt black rule ── */
+          #s1a-print-document .s1a-hdr-divider {
+            border-top: 1pt solid #000 !important;
+            padding-top: 6px !important;
+            margin-top: 6px !important;
+          }
+
+          /* Vertical rhythm: header info → divider ── */
+          #s1a-print-document .s1a-hdr-left {
+            margin-top: 6px !important;
+          }
+
+          /* ── 8. TAX CODE: no badge, plain inline text ── */
+          #s1a-print-document .s1a-tax-code {
+            font-family: inherit !important;
+            font-size: inherit !important;
+            background: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            color: #1f2937 !important;
+            font-weight: 600 !important;
+          }
+
+          /* ── 9. TITLE: tight vertical rhythm ── */
+          #s1a-print-document .s1a-doc-title {
+            margin-top: 10px !important;
+          }
+
+          /* Title → period gap ── */
+          #s1a-print-document .s1a-period {
+            margin-top: 4px !important;
+          }
+
+          /* ── 10. TABLE: full-width, fixed layout, correct proportions ── */
+          #s1a-print-document .s1a-print-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            margin-top: 8px !important;
+          }
+
+          #s1a-print-document table.s1a-print-table-el {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            font-size: 10pt !important;
+          }
+
+          /* Column proportions: 22 / 55 / 23 ── */
+          #s1a-print-document table.s1a-print-table-el th.s1a-th-date {
+            width: 22% !important;
+          }
+          #s1a-print-document table.s1a-print-table-el th.s1a-th-dien-giai {
+            width: 55% !important;
+          }
+          #s1a-print-document table.s1a-print-table-el th.s1a-th-amount {
+            width: 23% !important;
+            text-align: right !important;
+          }
+
+          /* Body / data rows: 22 / 55 / 23 ── */
+          #s1a-print-document table.s1a-print-table-el tbody td:first-child {
+            width: 22% !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tbody td:nth-child(2) {
+            width: 55% !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tbody td:last-child {
+            width: 23% !important;
+          }
+
+          /* Tfoot total label / amount: 22 / 55 / 23 ── */
+          #s1a-print-document table.s1a-print-table-el tfoot td:first-child {
+            width: 77% !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tfoot td.s1a-td-amount {
+            width: 23% !important;
+          }
+
+          /* Table cell padding: 5px 7px ── */
+          #s1a-print-document table.s1a-print-table-el th,
+          #s1a-print-document table.s1a-print-table-el td {
+            font-size: 10pt !important;
+            padding: 5px 7px !important;
+            line-height: 1.4 !important;
+            vertical-align: middle !important;
+          }
+
+          /* Amount column: right-aligned, tabular, no wrap ── */
+          #s1a-print-document table.s1a-print-table-el td.s1a-td-amount,
+          #s1a-print-document table.s1a-print-table-el th.s1a-th-amount {
+            text-align: right !important;
+            white-space: nowrap !important;
+          }
+
+          /* Total row: bold 11pt ── */
+          #s1a-print-document table.s1a-print-table-el tfoot td {
+            font-size: 11pt !important;
+            font-weight: 700 !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tfoot td.s1a-td-amount {
+            text-align: right !important;
+          }
+
+          /* ── 11. TABLE BORDERS: black 0.5pt, header 1pt, total 1.5pt ── */
+          #s1a-print-document table.s1a-print-table-el th,
+          #s1a-print-document table.s1a-print-table-el td {
+            border: 0.5pt solid #000 !important;
+          }
+          #s1a-print-document table.s1a-print-table-el thead th {
+            border-bottom-width: 1pt !important;
+            border-color: #000 !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tfoot td {
+            border-top: 1.5pt solid #000 !important;
+            border-bottom: none !important;
+            border-left: none !important;
+            border-right: none !important;
+          }
+
+          /* Header row shade ── */
+          #s1a-print-document table.s1a-print-table-el thead th {
+            background-color: #f5f5f5 !important;
+          }
+
+          /* Total row shade ── */
+          #s1a-print-document table.s1a-print-table-el tfoot tr td {
+            background-color: #fffbeb !important;
+          }
+
+          /* ── 12. SIGNATURE BLOCK: 52/48 two-column ── */
+          #s1a-print-document .s1a-signature-block {
+            display: flex !important;
+            flex-direction: row !important;
+            margin-top: 20px !important;
+          }
+
+          /* ── 13. TYPOGRAPHY sizes ── */
+          /* HKD info 10–11pt ── */
+          #s1a-print-document .s1a-hkd-name {
+            font-size: 11pt !important;
+            line-height: 1.4 !important;
+          }
+          #s1a-print-document .s1a-hkd-meta {
+            font-size: 10pt !important;
+            line-height: 1.5 !important;
+          }
+
+          /* Title 14pt bold ── */
+          #s1a-print-document .s1a-title {
+            font-size: 14pt !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
+          }
+
+          /* Period 10.5pt ── */
+          #s1a-print-document .s1a-period {
+            font-size: 10.5pt !important;
+            line-height: 1.5 !important;
+          }
+
+          /* Signature 10pt ── */
+          #s1a-print-document .s1a-signature {
+            font-size: 10pt !important;
+            line-height: 1.6 !important;
+          }
+          #s1a-print-document .s1a-signature p {
+            font-size: 10pt !important;
+          }
+
+          /* ── 14. MULTI-PAGE SAFETY ── */
+          #s1a-print-document table.s1a-print-table-el thead {
+            display: table-header-group !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tfoot {
+            display: table-footer-group !important;
+          }
+          #s1a-print-document table.s1a-print-table-el tbody tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* ── 15. TEXT COLOURS — near-black accounting standard ── */
+          .text-slate-900 { color: #0f172a !important; }
+          .text-slate-800 { color: #1e293b !important; }
+          .text-slate-700 { color: #334155 !important; }
+          .text-slate-600 { color: #475569 !important; }
+          .text-slate-500 { color: #64748b !important; }
+          .text-gray-900  { color: #111827 !important; }
+          .text-gray-800  { color: #1f2937 !important; }
+          .text-gray-700  { color: #374151 !important; }
+          .text-gray-600  { color: #4b5563 !important; }
+          .text-gray-500  { color: #6b7280 !important; }
+          .text-gray-400  { color: #9ca3af !important; }
+          .text-emerald-600 { color: #059669 !important; }
+          .text-emerald-500 { color: #10b981 !important; }
+
+          /* ── 16. BACKGROUND COLOURS ── */
+          .bg-white      { background-color: #ffffff !important; }
+          .bg-gray-100   { background-color: #f5f5f5 !important; }
+          .bg-slate-100  { background-color: #ffffff !important; }
+          .bg-amber-50   { background-color: #fffbeb !important; }
+          .bg-slate-50   { background-color: #ffffff !important; }
+
+          /* ── 17. OVERFLOW — prevent blank extra pages ── */
+          .overflow-x-auto {
+            overflow: visible !important;
+          }
+
+          /* ── 18. A4 PAGE DEFINITION ── */
+          @page {
+            size: A4 portrait;
+            margin: 12mm 14mm;
+          }
         }
       `}</style>
     </div>

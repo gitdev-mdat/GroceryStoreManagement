@@ -17,10 +17,10 @@ import CloseBookForm from '../components/s1a/CloseBookForm'
 const NAV_CARDS = [
   {
     id: 'list',
-    title: 'Danh sách phiếu',
-    desc: 'Xem & quản lý',
+    title: 'Danh sách doanh thu',
+    desc: 'Xem doanh thu theo ngày',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
         <rect x="9" y="3" width="6" height="4" rx="1" />
         <line x1="9" y1="12" x2="15" y2="12" />
@@ -30,16 +30,18 @@ const NAV_CARDS = [
   },
   {
     id: 'add',
-    title: 'Thêm phiếu',
-    desc: 'Tạo phiếu mới',
+    title: 'Ghi nhận doanh thu',
+    desc: 'Nhập doanh thu một ngày',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="16" />
         <line x1="8" y1="12" x2="16" y2="12" />
       </svg>
     ),
   },
+  /* 
+  Temporarily hidden because monthly-entry logic conflicts with the one-day-one-record S1A rule.
   {
     id: 'batchAdd',
     title: 'Doanh thu tháng',
@@ -55,12 +57,13 @@ const NAV_CARDS = [
       </svg>
     ),
   },
+  */
   {
     id: 'ledger',
-    title: 'Sổ S1A-HKD',
-    desc: 'Xem báo cáo',
+    title: 'Sổ S1A',
+    desc: 'Xem báo cáo theo mẫu thuế',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <polyline points="14 2 14 8 20 8" />
         <line x1="16" y1="13" x2="8" y2="13" />
@@ -71,9 +74,9 @@ const NAV_CARDS = [
   {
     id: 'closeBook',
     title: 'Chốt sổ S1A',
-    desc: 'Khóa dữ liệu',
+    desc: 'Khóa dữ liệu kỳ kế toán',
     icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
       </svg>
@@ -116,42 +119,125 @@ export default function HoSoS1A() {
   }, [fetchStats])
 
   return (
-    <div className="page-shell">
+    <div className="mx-auto w-full max-w-[800px] px-4 pb-20 pt-6 sm:px-6 sm:pt-8 sm:pb-24">
       {/* Hub View */}
       {view === 'hub' && (
         <>
-          <div className="page-topbar-new">
-            <h1 className="page-title-new">Hồ sơ S1A</h1>
-            <p className="page-subtitle-new">Sổ doanh thu bán hàng hóa, dịch vụ · Thông tư 152/2025/TT-BTC</p>
+          {/* Header */}
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Hồ sơ S1A
+            </h1>
+            <p className="mt-1.5 text-sm text-slate-500 sm:text-base">
+              Sổ doanh thu bán hàng hóa, dịch vụ · Thông tư 152/2025/TT-BTC
+            </p>
           </div>
 
-          <div className="hub-stats-bar">
-            <div className="hub-stat">
-              <span className="hub-stat-value">{loading ? '—' : stats.tickets}</span>
-              <span className="hub-stat-label">Phiếu phát sinh tháng này</span>
+          {/* Stats Bar */}
+          <div className="mb-8 flex flex-col sm:flex-row overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Stat: Tickets */}
+            <div className="flex flex-1 flex-col justify-center px-5 py-5 border-b sm:border-b-0 sm:border-r border-slate-100">
+              <span className="text-3xl font-bold tracking-tight text-slate-900">
+                {loading ? '—' : stats.tickets}
+              </span>
+              <span className="mt-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                Ngày có dữ liệu tháng này
+              </span>
             </div>
-            <div className="hub-stat-divider" />
-            <div className="hub-stat">
-              <span className="hub-stat-value text-emerald">{loading ? '—' : formatVnd(stats.total)}</span>
-              <span className="hub-stat-label">Tổng doanh thu tháng này</span>
+            
+            {/* Stat: Revenue */}
+            <div className="flex flex-1 flex-col justify-center px-5 py-5 bg-slate-50/50">
+              <span className="text-3xl font-bold tracking-tight text-brand-600">
+                {loading ? '—' : formatVnd(stats.total)}
+                {!loading && <span className="ml-1.5 text-base font-semibold text-brand-500">đ</span>}
+              </span>
+              <span className="mt-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                Tổng doanh thu tháng này
+              </span>
             </div>
           </div>
 
-          <div className="nav-cards-grid">
-            {NAV_CARDS.map((card) => (
+          {/* Main Actions Grid (3 cards) */}
+          <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            {NAV_CARDS.filter(c => c.id !== 'closeBook' && c.id !== 'batchAdd').map((card) => (
               <button
                 key={card.id}
                 type="button"
-                className="nav-card"
+                className="
+                  group relative flex min-h-[96px] w-full items-center gap-4
+                  rounded-2xl border border-slate-200 bg-white p-4
+                  transition-all duration-200 ease-out
+                  hover:border-brand-300 hover:shadow-md
+                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
+                "
                 onClick={() => setView(card.id)}
               >
-                <div className="nav-card-icon">{card.icon}</div>
-                <div className="nav-card-body">
-                  <div className="nav-card-title">{card.title}</div>
-                  <div className="nav-card-desc">{card.desc}</div>
+                {/* Icon */}
+                <div className="
+                  flex h-12 w-12 shrink-0 items-center justify-center rounded-xl
+                  bg-brand-50 text-brand-600
+                  transition-colors duration-200 group-hover:bg-brand-100
+                ">
+                  {card.icon}
                 </div>
-                <div className="nav-card-arrow">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                
+                {/* Text */}
+                <div className="flex flex-1 flex-col text-left">
+                  <div className="text-base font-semibold text-slate-900 md:text-lg">
+                    {card.title}
+                  </div>
+                  <div className="mt-0.5 text-[13px] text-slate-500 line-clamp-1">
+                    {card.desc}
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <div className="shrink-0 text-slate-300 transition-all duration-200 group-hover:translate-x-1 group-hover:text-brand-500">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Secondary Actions (Full width) */}
+          <div className="grid grid-cols-1">
+            {NAV_CARDS.filter(c => c.id === 'closeBook').map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                className="
+                  group relative flex min-h-[88px] w-full items-center gap-4
+                  rounded-2xl border border-slate-200 bg-slate-50 p-4
+                  transition-all duration-200 ease-out
+                  hover:border-brand-300 hover:bg-white hover:shadow-md
+                  focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
+                "
+                onClick={() => setView(card.id)}
+              >
+                {/* Icon */}
+                <div className="
+                  flex h-11 w-11 shrink-0 items-center justify-center rounded-xl
+                  bg-slate-200 text-slate-600
+                  transition-colors duration-200 group-hover:bg-brand-50 group-hover:text-brand-600
+                ">
+                  {card.icon}
+                </div>
+                
+                {/* Text */}
+                <div className="flex flex-1 flex-col text-left">
+                  <div className="text-[15px] font-semibold text-slate-800 md:text-base">
+                    {card.title}
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    {card.desc}
+                  </div>
+                </div>
+
+                {/* Chevron */}
+                <div className="shrink-0 text-slate-300 transition-all duration-200 group-hover:translate-x-1 group-hover:text-brand-500">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
                 </div>
