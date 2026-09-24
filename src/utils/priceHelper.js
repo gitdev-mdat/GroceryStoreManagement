@@ -8,6 +8,7 @@ function loadPriceBook() {
     if (!Array.isArray(data)) return []
     return data.map((item) => ({
       product_id: String(item.product_id || slugify(item.product_name) || `product-${Math.random().toString(36).slice(2, 9)}`),
+      product_code: String(item.product_code || '').trim(),
       product_name: String(item.product_name || '').trim(),
       don_vi_tinh: String(item.don_vi_tinh || '').trim(),
       latest_price: Number(item.latest_price) || 0,
@@ -66,6 +67,7 @@ export function saveToProductPriceBook(danhSachHangHoa = [], ngayXuatInvoice, fo
     .filter((item) => item && item.ten_hang && item.don_gia_sau_vat != null && Number(item.don_gia_sau_vat) > 0)
     .map((item) => ({
       ten_hang: String(item.ten_hang).trim(),
+      product_code: String(item.product_code || item.ma_hang_goc || '').trim(),
       don_vi_tinh: String(item.don_vi_tinh || '').trim(),
       don_gia_sau_vat: Number(item.don_gia_sau_vat) || 0,
       so_luong: Number(item.so_luong) || 0,
@@ -80,9 +82,10 @@ export function saveToProductPriceBook(danhSachHangHoa = [], ngayXuatInvoice, fo
   const invoiceDate = typeof formatDateDisplay === 'function' ? formatDateDisplay(ngayXuatInvoice) : new Date().toLocaleDateString('vi-VN')
 
   for (const row of items) {
-    const productId = slugify(row.ten_hang) || `product-${Math.random().toString(36).slice(2, 9)}`
+    const productId = slugify(row.product_code || row.ten_hang) || `product-${Math.random().toString(36).slice(2, 9)}`
     const current = byId.get(productId) || {
       product_id: productId,
+      product_code: row.product_code,
       product_name: row.ten_hang,
       don_vi_tinh: row.don_vi_tinh,
       latest_price: 0,
@@ -114,6 +117,7 @@ export function saveToProductPriceBook(danhSachHangHoa = [], ngayXuatInvoice, fo
     byId.set(productId, {
       ...current,
       product_id: productId,
+      product_code: row.product_code,
       product_name: row.ten_hang,
       don_vi_tinh: row.don_vi_tinh,
       latest_price: currentPrice,

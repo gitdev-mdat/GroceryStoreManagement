@@ -11,8 +11,14 @@ import { resizeAndCompressImage } from '../utils/imageHelper'
 import { formatToInputDate } from '../utils/dateHelper'
 import { saveToProductPriceBook } from '../utils/priceHelper'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { normalizeCanonicalName, normalizeSourceProduct } from '../lib/productResolver'
+import {
+  createSupabaseProductRepository,
+  importInvoiceProducts,
+  preflightInvoiceProducts,
+} from '../lib/productImport'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { abbreviationDictionary } from '../utils/abbreviationDictionary'
+import ProductResolutionDialog from '../components/ProductResolutionDialog'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
@@ -243,77 +249,6 @@ function isNonProductRow({ ten_hang = '', don_gia_sau_vat, don_gia_truoc_vat } =
   return false
 }
 
-function capitalizeProductName(text) {
-  return String(text || '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .split(' ')
-    .map((part, idx) => {
-      if (!part) return part
-      if (/^[A-Z0-9\.\-]+$/i.test(part) && part.length <= 12) return part.toUpperCase()
-      const lower = part.toLowerCase()
-      if (idx === 0) return lower.charAt(0).toUpperCase() + lower.slice(1)
-      return lower
-    })
-    .join(' ')
-}
-
-// Chuẩn hóa Title Case: mỗi từ viết hoa chữ cái đầu (VD: "Bánh Mì Tươi Kinh Đô")
-function toTitleCase(text) {
-  if (!text) return ''
-  return String(text)
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
-
-function expandAbbreviations(text) {
-  if (!text) return ''
-  
-  const abbrMap = new Map()
-  Object.entries(abbreviationDictionary).forEach(([abbr, full]) => {
-    abbrMap.set(String(abbr).toUpperCase(), full)
-  })
-
-  const tokens = String(text).split(/\s+/)
-  
-  const expandedTokens = tokens.map(token => {
-    const upperToken = token.toUpperCase()
-    if (abbrMap.has(upperToken)) {
-      return abbrMap.get(upperToken)
-    }
-    
-    // Check for tokens attached to basic punctuation like "TH," or "(TH)"
-    const match = token.match(/^([.,/#!$%^&*;:{}=\-_`~()[\]"']*)(.*?)([.,/#!$%^&*;:{}=\-_`~()[\]"']*)$/)
-    if (match) {
-      const prefix = match[1]
-      const core = match[2]
-      const suffix = match[3]
-      const upperCore = core.toUpperCase()
-      if (upperCore && abbrMap.has(upperCore)) {
-        const full = abbrMap.get(upperCore)
-        if (String(text).toUpperCase().includes(full.toUpperCase())) {
-          return token
-        }
-        return prefix + full + suffix
-      }
-    }
-    
-    return token
-  })
-
-  return expandedTokens.join(' ')
-}
-
-function normalizeProductName(raw) {
-  if (!raw) return ''
-  const expanded = expandAbbreviations(raw)
-  return capitalizeProductName(expanded)
-}
-
 function normalizeInvoiceDate(rawDate) {
   if (!rawDate) return ''
   const str = String(rawDate).trim()
@@ -376,8 +311,8 @@ function handleProductFieldChange(index, field, rawValue) {
     const item = { ...updated[index] }
 
     if (field === 'ten_hang') {
-      item.ten_hang = toTitleCase(rawValue)
-      item.item_name = toTitleCase(rawValue)
+      item.ten_hang = normalizeCanonicalName(rawValue)
+      item.item_name = normalizeCanonicalName(rawValue)
     } else if (field === 'don_vi_tinh') {
       item.don_vi_tinh = rawValue
       item.unit = rawValue
@@ -429,9 +364,11 @@ function sanitizeOcrData(rawData) {
         finalType = 'MUA'
       }
 
+      const sourceDescription = cleanString(item.item_name || item.ten_hang)
       return {
         ...item,
-        item_name: cleanString(item.item_name || item.ten_hang),
+        source_description: sourceDescription,
+        item_name: sourceDescription,
         unit: cleanString(item.unit || item.don_vi_tinh),
         product_code: cleanString(item.product_code || item.ma_hang_goc),
         row_type: finalType,
@@ -511,19 +448,24 @@ function cleanAndNormalizeItems(rawItems = []) {
     const rowType = item.row_type || item.loai_dong || 'MUA'
     const priceAfterVat = item.unit_price_after_vat || item.don_gia_sau_vat || 0
     const priceBeforeVat = item.unit_price_before_vat || item.don_gia_truoc_vat || 0
-    const productCode = item.product_code || item.ma_hang_goc || ''
+    const identity = normalizeSourceProduct({
+      product_code: item.product_code || item.ma_hang_goc || '',
+      source_description: item.source_description || item.item_name || item.ten_hang || '',
+      unit: item.unit || item.don_vi_tinh || '',
+    })
 
     return {
       ...item,
       _raw_index: idx,
+      source_description: String(item.source_description || item.item_name || item.ten_hang || '').trim(),
       row_type: String(rowType).toUpperCase(),
       loai_dong: String(rowType).toUpperCase(), // backward compat
-      product_code: String(productCode).trim(),
-      ma_hang_goc: String(productCode).trim(), // backward compat
-      ten_hang: normalizeProductName(item.item_name || item.ten_hang),
-      item_name: normalizeProductName(item.item_name || item.ten_hang),
-      don_vi_tinh: String(item.unit || item.don_vi_tinh || '').trim(),
-      unit: String(item.unit || item.don_vi_tinh || '').trim(), // backward compat
+      product_code: identity.productCode,
+      ma_hang_goc: identity.productCode, // backward compat
+      ten_hang: identity.candidateName,
+      item_name: identity.candidateName,
+      don_vi_tinh: identity.unit,
+      unit: identity.unit, // backward compat
       so_luong: Number(item.quantity || item.so_luong) || 0,
       quantity: Number(item.quantity || item.so_luong) || 0, // backward compat
       don_gia_sau_vat: parseVietnamesePrice(priceAfterVat),
@@ -644,6 +586,7 @@ export default function HoaDonVAT() {
   // Duplicate check state
   const [duplicateInvoice, setDuplicateInvoice] = useState(null)
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
+  const [resolutionIssues, setResolutionIssues] = useState([])
 
   // Image viewer state
   const [viewerImage, setViewerImage] = useState(null)
@@ -669,6 +612,7 @@ export default function HoaDonVAT() {
     setOcrItems([])
     setEditableItems([])
     setDuplicateInvoice(null)
+    setResolutionIssues([])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -774,7 +718,6 @@ export default function HoaDonVAT() {
       if (parts.length === 3) dbDateApply = `${parts[2]}-${parts[1]}-${parts[0]}`
     }
 
-    saveToProductPriceBook(normalizedItems, dbDateApply, formatDateDisplay)
     setOcrItems(normalizedItems || [])
     setEditableItems(normalizedItems || [])
   }
@@ -835,8 +778,12 @@ PRODUCT_NAME_RULE:
 
 PRODUCT EXTRACTION RULES:
 - Preserve original unit of measure exactly (Thùng, Lốc, Két, Chai, Bao, Hộp, Lon, Gói, Cái...)
+- Extract product_code only when a distinct product code/SKU is visibly printed for that row. Otherwise return null.
+- Never infer product_code from an uppercase brand/name token such as AFC, G7, NUVI, 2IN1 or 3IN1.
+- Do not decide whether an item matches an existing database product. The application resolves identity deterministically.
+- If item_name, product_code, or unit is unreadable, return null for that field instead of guessing.
 - If a line is promotional (price=0, name contains K.M/Khuyến mãi/Quà tặng) → row_type: 'KM'
-- For KM lines, extract their exact unit of measure and set product_code to the product code of the matched MUA line above.
+- For KM lines, extract their exact visible unit and product code; do not copy a code from another row unless it is printed on the KM row.
 - Clean and filter out rows that are purely discounts.
 - For each item in the 'products' array, you must determine the 'row_type':
   - If the item has a price greater than 0, set 'row_type' to 'MUA'.
@@ -870,13 +817,13 @@ Return valid JSON only.`
             items: {
               type: 'OBJECT',
               properties: {
-                item_name: { type: 'STRING' },
-                unit: { type: 'STRING' },
+                item_name: { type: 'STRING', nullable: true },
+                unit: { type: 'STRING', nullable: true },
                 quantity: { type: 'NUMBER' },
                 unit_price_after_vat: { type: 'NUMBER' },
                 unit_price_before_vat: { type: 'NUMBER' },
                 row_type: { type: 'STRING' },
-                product_code: { type: 'STRING' },
+                product_code: { type: 'STRING', nullable: true },
               },
             },
           },
@@ -1195,6 +1142,14 @@ Return valid JSON only.`
           }
         }
 
+        const productRepository = createSupabaseProductRepository(supabase)
+        const productPreflight = await preflightInvoiceProducts(productRepository, editableItems)
+        if (productPreflight.ambiguous.length) {
+          setResolutionIssues(productPreflight.ambiguous)
+          setIsSaving(false)
+          return
+        }
+
         // ===========================
         // Upload ảnh hóa đơn lên Supabase Storage
         // ===========================
@@ -1288,74 +1243,18 @@ Return valid JSON only.`
         // Bước 3: Lưu sản phẩm & lịch sử giá (dùng editableItems — đã bao gồm chỉnh sửa của user)
         // ===========================
         const cleaned = editableItems
-
-        for (const item of cleaned) {
-          const { data: existingProduct, error: productSelectError } = await supabase
-            .from('products')
-            .select('id')
-            .eq('product_name', item.ten_hang)
-            .limit(1)
-
-          if (productSelectError) {
-            throw new Error(`Không thể kiểm tra sản phẩm "${item.ten_hang}": ${productSelectError.message}`)
-          }
-
-          let productId
-          if (existingProduct && existingProduct.length > 0) {
-            productId = existingProduct[0].id
-          } else {
-            const { data: newProduct, error: productInsertError } = await supabase
-              .from('products')
-              .insert([{
-                product_name: item.ten_hang,
-                unit: item.don_vi_tinh,
-                status: 'ACTIVE',
-              }])
-              .select()
-              .single()
-
-            if (productInsertError) {
-              throw new Error(`Không thể tạo sản phẩm "${item.ten_hang}": ${productInsertError.message}`)
-            }
-            productId = newProduct.id
-          }
-
-          const suggestedPrice = calculateSmartRetailPrice(item)
-
-          // Validate row_type strictly for Check Constraint
-          const rawRowType = item.row_type || item.rowType;
-          let validatedRowType = 'MUA';
-
-          if (rawRowType) {
-            const cleanType = String(rawRowType).trim().toUpperCase();
-            if (cleanType === 'MUA' || cleanType === 'KM') {
-              validatedRowType = cleanType;
-            }
-          } else if (Number(item.unit_price_after_vat) === 0) {
-            validatedRowType = 'KM';
-          }
-
-          const { error: historyInsertError } = await supabase
-            .from('price_history')
-            .insert([{
-              product_id: productId,
-              invoice_id: invoiceId,
-              import_date: dbDate,
-              unit_price_after_vat: item.unit_price_after_vat,
-              quantity: item.so_luong || 0,
-              row_type: validatedRowType,
-              suggested_retail_price: suggestedPrice,
-              is_active_price: true,
-            }])
-
-          if (historyInsertError) {
-            throw new Error(`Không thể lưu lịch sử giá cho "${item.ten_hang}": ${historyInsertError.message}`)
-          }
+        const importResult = await importInvoiceProducts({
+          repository: productRepository,
+          invoiceId,
+          importDate: dbDate,
+          items: cleaned,
+          groupKey: selectedGroupId,
+          suggestedPriceFor: calculateSmartRetailPrice,
+        })
+        if (importResult.status === 'AMBIGUOUS') {
+          throw new Error('Danh tính sản phẩm thay đổi trong lúc lưu. Vui lòng xác nhận lại sản phẩm.')
         }
 
-        if (cleaned.length) {
-          saveToProductPriceBook(cleaned, dbDate, formatDateDisplay)
-        }
       } else {
         // Fallback localStorage nếu chưa cấu hình Supabase
         ensureCompanyExists(companyName, companyMst)
@@ -2058,6 +1957,15 @@ Return valid JSON only.`
               return
             }
 
+            const cleaned = editableItems
+            const productRepository = createSupabaseProductRepository(supabase)
+            const productPreflight = await preflightInvoiceProducts(productRepository, cleaned)
+            if (productPreflight.ambiguous.length) {
+              setResolutionIssues(productPreflight.ambiguous)
+              setIsSaving(false)
+              return
+            }
+
             const companyMst = congTyMst.trim()
             let supplierId = null
             if (companyMst) {
@@ -2119,38 +2027,14 @@ Return valid JSON only.`
 
             const invoiceId = newInvoice.id
             console.log('[DEBUG DUP CONFIRM] saved with invoiceId:', invoiceId)
-            const cleaned = editableItems
-            for (const item of cleaned) {
-              const { data: existingProduct } = await supabase.from('products').select('id').eq('product_name', item.ten_hang).limit(1)
-              let productId
-              if (existingProduct && existingProduct.length > 0) {
-                productId = existingProduct[0].id
-              } else {
-                const { data: newProduct } = await supabase.from('products').insert([{ product_name: item.ten_hang, unit: item.don_vi_tinh, status: 'ACTIVE' }]).select().single()
-                productId = newProduct.id
-              }
-              const suggestedPrice = calculateSmartRetailPrice(item)
-              const rawRowType = item.row_type || item.rowType
-              let validatedRowType = 'MUA'
-              if (rawRowType) {
-                const cleanType = String(rawRowType).trim().toUpperCase()
-                if (cleanType === 'MUA' || cleanType === 'KM') validatedRowType = cleanType
-              } else if (Number(item.unit_price_after_vat) === 0) {
-                validatedRowType = 'KM'
-              }
-              await supabase.from('price_history').insert([{
-                product_id: productId,
-                invoice_id: invoiceId,
-                import_date: date,
-                unit_price_after_vat: item.unit_price_after_vat,
-                quantity: item.so_luong || 0,
-                row_type: validatedRowType,
-                suggested_retail_price: suggestedPrice,
-                is_active_price: true,
-              }])
-            }
-            if (cleaned.length) saveToProductPriceBook(cleaned, date, formatDateDisplay)
-
+            await importInvoiceProducts({
+              repository: productRepository,
+              invoiceId,
+              importDate: date,
+              items: cleaned,
+              groupKey: groupKey || inventory[0]?.id,
+              suggestedPriceFor: calculateSmartRetailPrice,
+            })
             resetForm()
             setOcrMessage('Đã lưu hóa đơn trùng lặp thành công.')
           } catch (err) {
@@ -2176,6 +2060,23 @@ Return valid JSON only.`
           </div>
         )}
       </ConfirmDialog>
+
+      <ProductResolutionDialog
+        issues={resolutionIssues}
+        onSelect={(itemIndex, productId) => {
+          setEditableItems(current => current.map((item, index) => index === itemIndex
+            ? { ...item, _resolved_product_id: productId, _confirm_new_product: false }
+            : item))
+          setResolutionIssues(current => current.filter(row => row.index !== itemIndex))
+        }}
+        onConfirmNew={(itemIndex) => {
+          setEditableItems(current => current.map((item, index) => index === itemIndex
+            ? { ...item, _confirm_new_product: true, _resolved_product_id: null }
+            : item))
+          setResolutionIssues(current => current.filter(row => row.index !== itemIndex))
+        }}
+        onClose={() => setResolutionIssues([])}
+      />
     </div>
   )
 }

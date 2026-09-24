@@ -1,0 +1,9 @@
+{
+  "fixture": "representative-ui-context",
+  "legacy_characters": 3052256,
+  "optimized_characters": 2979,
+  "estimated_legacy_tokens": 763064,
+  "estimated_optimized_tokens": 744,
+  "reduction_percent": 99.9,
+  "inline_image_payload_in_optimized": false
+}

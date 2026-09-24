@@ -44,7 +44,7 @@ const NAV_GROUPS = [
     label: 'Báo cáo thống kê',
     roles: ['ADMIN', 'STAFF'],
     items: [
-      { to: '/bao-cao', label: 'Báo cáo biến động', icon: '📊', roles: ['ADMIN', 'STAFF'] },
+      { to: '/bao-cao', label: 'Tổng quan tài chính', icon: '📊', roles: ['ADMIN', 'STAFF'] },
       { to: '/tong-hop-thang', label: 'Tổng hợp mua vào', icon: '📅', roles: ['ADMIN'] },
     ],
   },
@@ -248,6 +248,20 @@ function Dashboard() {
 // ── Root component: handles auth state machine ───────────────────────────────
 export default function App() {
   const { user, loading } = useAuth()
+  // Development-only visual review entry point. It renders the real report and
+  // still uses the anon Supabase client/RLS; production builds remove this path.
+  const visualReport = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).get('visual-report') === '1'
+
+  if (visualReport) {
+    return (
+      <BrowserRouter>
+        <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+          <BaoCao />
+        </main>
+      </BrowserRouter>
+    )
+  }
 
   if (loading) return <AuthLoadingScreen />
 

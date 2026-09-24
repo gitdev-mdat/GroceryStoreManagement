@@ -292,9 +292,9 @@ export default function LoginPage() {
               value={password} onChange={(e) => { setPassword(e.target.value); setError('') }}
               placeholder="••••••••" icon={Lock} disabled={loading}
               rightEl={
-                <button type="button" tabIndex={-1}
+                <button type="button"
                   onClick={() => setShowPass(v => !v)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-0.5"
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-md focus-visible:outline-none focus-visible:text-[#1e3a5f] focus-visible:ring-2 focus-visible:ring-[#1e3a5f] focus-visible:ring-offset-2"
                   aria-label={showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
                   {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -307,9 +307,10 @@ export default function LoginPage() {
                 value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••" icon={Lock} disabled={loading}
                 rightEl={
-                  <button type="button" tabIndex={-1}
+                  <button type="button"
                     onClick={() => setShowConfirm(v => !v)}
-                    className="text-slate-400 hover:text-slate-600 transition-colors p-0.5"
+                    className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-md focus-visible:outline-none focus-visible:text-[#1e3a5f] focus-visible:ring-2 focus-visible:ring-[#1e3a5f] focus-visible:ring-offset-2"
+                    aria-label={showConfirm ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
                   >
                     {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>

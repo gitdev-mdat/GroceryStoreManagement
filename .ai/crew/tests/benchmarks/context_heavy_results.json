@@ -1,0 +1,27 @@
+{
+  "fixture": "context_heavy_benchmark.py",
+  "task_characters": 15455,
+  "before": {
+    "transport": "legacy full TASK.md and raw diff propagation",
+    "status": "DONE",
+    "repair_count": 0,
+    "roles": {
+      "lead": {"requests": 3, "prompt_tokens": 15098, "completion_tokens": 1159, "cached_prompt_tokens": 0},
+      "implementer": {"requests": 6, "prompt_tokens": 40968, "completion_tokens": 1449, "cached_prompt_tokens": 0},
+      "reviewer": {"requests": 1, "prompt_tokens": 9713, "completion_tokens": 155, "cached_prompt_tokens": 0}
+    },
+    "total": {"requests": 10, "prompt_tokens": 65779, "completion_tokens": 2763, "cached_prompt_tokens": 0}
+  },
+  "after": {
+    "transport": "compact contract and repository references",
+    "status": "DONE",
+    "repair_count": 0,
+    "roles": {
+      "lead": {"requests": 3, "prompt_tokens": 15098, "completion_tokens": 1203, "cached_prompt_tokens": 0},
+      "implementer": {"requests": 4, "prompt_tokens": 8948, "completion_tokens": 1030, "cached_prompt_tokens": 0},
+      "reviewer": {"requests": 2, "prompt_tokens": 8927, "completion_tokens": 333, "cached_prompt_tokens": 0}
+    },
+    "total": {"requests": 9, "prompt_tokens": 32973, "completion_tokens": 2566, "cached_prompt_tokens": 0}
+  },
+  "prompt_token_reduction_percent": 49.87
+}

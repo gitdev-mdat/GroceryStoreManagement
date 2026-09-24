@@ -1,7 +1,10 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { formatVndExact } from '../components/FormatNumber'
 import { useToast } from '../components/Toast'
+import { queryPriceBook, filterPriceBook, formatStoredVnd } from '../lib/priceBook'
+import { canonicalNameKey, normalizeCanonicalName, normalizeProductCode, normalizeUnitDisplay, normalizeUnitKey } from '../lib/productResolver'
+import { createSupabaseProductVisibilityRepository, PRODUCT_STATUS, setProductVisibility } from '../lib/productVisibility'
 
 const PAGE_SIZE = 10
 
@@ -163,110 +166,87 @@ function SkeletonCard() {
   )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function calcRetail(price) {
-  if (!price || price <= 0) return 0
-  return price >= 2000
-    ? Math.ceil(price * 1.15 / 1000) * 1000
-    : Math.ceil(price * 1.15 / 100) * 100
-}
-
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function TraCuuGia() {
+const loadLivePriceBook = status => queryPriceBook(supabase, { status })
+
+export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobile = false }) {
   const [products, setProducts] = useState([])
-  const [priceData, setPriceData] = useState({})
+  const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [hideTarget, setHideTarget] = useState(null)
+  const [visibilityFilter, setVisibilityFilter] = useState(PRODUCT_STATUS.ACTIVE)
   const [saving, setSaving] = useState(false)
+  const loadRequestRef = useRef(0)
 
   const { showToast, ToastContainer } = useToast()
 
   const fetchPriceBookFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured()) { setLoading(false); return }
+    const requestId = ++loadRequestRef.current
     setLoading(true)
+    setLoadError(null)
     try {
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('id, product_name, unit, status')
-        .eq('status', 'ACTIVE')
-        .order('product_name', { ascending: true })
-      if (productsError) throw productsError
-
-      const { data: historyData, error: historyError } = await supabase
-        .from('price_history')
-        .select('product_id, import_date, unit_price_after_vat, suggested_retail_price, is_active_price')
-        .gt('unit_price_after_vat', 0)
-        .order('import_date', { ascending: false })
-      if (historyError) throw historyError
-
-      const priceMap = {}
-      const prevPriceMap = {}
-
-      historyData.forEach((h) => {
-        const pid = h.product_id
-        if (!priceMap[pid]) priceMap[pid] = h
-      })
-
-      historyData.forEach((h) => {
-        const pid = h.product_id
-        if (prevPriceMap[pid]) return
-        const currentIdx = historyData.findIndex(x => x.id === h.id)
-        if (currentIdx > 0) {
-          const prev = historyData.slice(currentIdx + 1).find(x => x.product_id === pid)
-          if (prev) prevPriceMap[pid] = prev
-        }
-      })
-
-      setProducts(productsData || [])
-
-      const pd = {}
-      productsData?.forEach(p => {
-        const latest = priceMap[p.id]
-        const prev = prevPriceMap[p.id]
-        let trend = { status: 'stable', percent: 0 }
-
-        if (latest && prev) {
-          const diff = latest.unit_price_after_vat - prev.unit_price_after_vat
-          const percent = prev.unit_price_after_vat > 0
-            ? (Math.abs(diff) / prev.unit_price_after_vat) * 100
-            : 0
-          if (diff > 0) trend = { status: 'up', percent }
-          else if (diff < 0) trend = { status: 'down', percent }
-        }
-
-        pd[p.id] = {
-          latest_price: latest?.unit_price_after_vat || 0,
-          latest_retail_price: latest?.suggested_retail_price || 0,
-          latest_date: latest?.import_date || null,
-          trend,
-        }
-      })
-
-      setPriceData(pd)
+      const nextProducts = await loadPriceBook(visibilityFilter)
+      if (requestId === loadRequestRef.current) setProducts(nextProducts)
     } catch (err) {
+      if (requestId !== loadRequestRef.current) return
       console.error('Lỗi fetch price book:', err)
+      setLoadError(err)
       showToast('Không thể tải danh mục giá. Vui lòng thử lại.', 'error')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [])
+  }, [loadPriceBook, visibilityFilter])
 
   useEffect(() => { fetchPriceBookFromSupabase() }, [fetchPriceBookFromSupabase])
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return products
-    return products.filter(item =>
-      (item.product_name || '').toLowerCase().includes(q) ||
-      (item.unit || '').toLowerCase().includes(q)
-    )
-  }, [products, query])
+  useEffect(() => {
+    if (!import.meta.env.DEV || !new URLSearchParams(window.location.search).has('catalogAudit')) return
+    let cancelled = false
+    import('../lib/catalogAudit.js').then(async ({ runLiveCatalogAudit }) => {
+      const audit = await runLiveCatalogAudit(supabase)
+      if (cancelled) return
+      const report = {
+        total: audit.total,
+        counts: audit.counts,
+        statusCounts: audit.records.reduce((result, row) => {
+          const status = row.product.status || 'MISSING'
+          result[status] = (result[status] || 0) + 1
+          return result
+        }, {}),
+        safeRows: audit.records.filter(row => row.classification === 'SAFE_AUTOFIX').map(row => ({
+          id: row.product.id,
+          product_code: row.product.product_code,
+          product_name: row.product.product_name,
+          unit: row.product.unit,
+          proposedChanges: row.proposedChanges,
+        })),
+        reviewRows: audit.records.filter(row => row.classification === 'REVIEW_REQUIRED').map(row => ({
+          id: row.product.id,
+          product_code: row.product.product_code,
+          product_name: row.product.product_name,
+          unit: row.product.unit,
+          status: row.product.status,
+          reasons: row.reasons,
+          invoice_ids: [...new Set(row.historyUsage.map(history => history.invoice_id).filter(Boolean))],
+        })),
+        duplicateSkus: audit.duplicateSkus.map(group => ({
+          sku: group.key,
+          products: group.products.map(product => ({ id: product.id, product_name: product.product_name, unit: product.unit, status: product.status })),
+        })),
+      }
+      console.info('__HAIKIEU_CATALOG_AUDIT__' + JSON.stringify(report))
+    }).catch(error => console.error('__HAIKIEU_CATALOG_AUDIT_ERROR__', error))
+    return () => { cancelled = true }
+  }, [])
 
-  useEffect(() => { setPage(1) }, [query])
+  const filtered = useMemo(() => filterPriceBook(products, query), [products, query])
+
+  useEffect(() => { setPage(1) }, [query, visibilityFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -276,40 +256,55 @@ export default function TraCuuGia() {
   const endItem = Math.min(start + PAGE_SIZE, filtered.length)
 
   const handleEdit = (item) => {
-    const pd = priceData[item.id] || {}
     setEditingProduct({
       id: item.id,
+      product_code: item.product_code,
       product_name: item.product_name,
       unit: item.unit,
-      latest_price: pd.latest_price || 0,
     })
     setIsEditModalOpen(true)
   }
 
   const handleSaveEditProduct = async () => {
     if (!editingProduct) return
+    const cleanName = normalizeCanonicalName(editingProduct.product_name)
+    const cleanUnit = normalizeUnitDisplay(editingProduct.unit)
+    const cleanCode = normalizeProductCode(editingProduct.product_code)
+    if (!cleanName || !cleanUnit) {
+      showToast('Tên sản phẩm và đơn vị tính không được để trống.', 'error')
+      return
+    }
+    const { data: allProducts, error: identityError } = await supabase
+      .from('products')
+      .select('id, product_code, product_name, unit, status')
+      .neq('id', editingProduct.id)
+    if (identityError) {
+      showToast('Không thể kiểm tra xung đột danh tính sản phẩm.', 'error')
+      return
+    }
+    const collision = (allProducts || []).find(product => (
+      (cleanCode &&
+        normalizeProductCode(product.product_code) === cleanCode &&
+        normalizeUnitKey(product.unit) === normalizeUnitKey(cleanUnit)) ||
+      (canonicalNameKey(product.product_name) === canonicalNameKey(cleanName) &&
+        normalizeUnitKey(product.unit) === normalizeUnitKey(cleanUnit))
+    ))
+    if (collision) {
+      showToast(`Danh tính này đang trùng với sản phẩm ${collision.product_code || collision.product_name}.`, 'error')
+      return
+    }
+    const sameSkuDifferentUnit = cleanCode && (allProducts || []).find(product =>
+      normalizeProductCode(product.product_code) === cleanCode &&
+      normalizeUnitKey(product.unit) !== normalizeUnitKey(cleanUnit)
+    )
+    if (sameSkuDifferentUnit && !window.confirm(`SKU ${cleanCode} cũng đang được dùng cho đơn vị ${sameSkuDifferentUnit.unit}. Bạn có chắc muốn tiếp tục?`)) return
     setSaving(true)
     try {
       const { error: productError } = await supabase
         .from('products')
-        .update({ product_name: editingProduct.product_name, unit: editingProduct.unit })
+        .update({ product_code: cleanCode || null, product_name: cleanName, unit: cleanUnit })
         .eq('id', editingProduct.id)
       if (productError) throw productError
-
-      const pd = priceData[editingProduct.id]
-      if (editingProduct.latest_price > 0 && editingProduct.latest_price !== pd?.latest_price) {
-        await supabase.from('price_history').update({ is_active_price: false }).eq('product_id', editingProduct.id).eq('is_active_price', true)
-        const suggestedRetail = calcRetail(editingProduct.latest_price)
-        await supabase.from('price_history').insert([{
-          product_id: editingProduct.id,
-          import_date: new Date().toISOString().split('T')[0],
-          unit_price_after_vat: editingProduct.latest_price,
-          quantity: 0,
-          row_type: 'MUA',
-          suggested_retail_price: suggestedRetail,
-          is_active_price: true,
-        }])
-      }
 
       showToast('Cập nhật sản phẩm thành công!', 'success')
       setIsEditModalOpen(false)
@@ -323,20 +318,20 @@ export default function TraCuuGia() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
+  const changeVisibility = async (product, status) => {
+    if (!product) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('products').update({ status: 'INACTIVE' }).eq('id', deleteTarget.id)
-      if (error) throw error
-      setProducts(prev => prev.filter(p => p.id !== deleteTarget.id))
-      showToast('Đã ẩn sản phẩm khỏi danh mục.', 'success')
+      const repository = createSupabaseProductVisibilityRepository(supabase)
+      await setProductVisibility(repository, product.id, status)
+      setProducts(prev => prev.filter(item => item.id !== product.id))
+      showToast(status === PRODUCT_STATUS.ACTIVE ? 'Đã khôi phục sản phẩm.' : 'Đã ẩn sản phẩm khỏi danh mục.', 'success')
     } catch (err) {
-      console.error('Lỗi xóa:', err)
-      showToast('Không thể xóa sản phẩm.', 'error')
+      console.error('Lỗi cập nhật trạng thái:', err)
+      showToast('Không thể cập nhật trạng thái sản phẩm.', 'error')
     } finally {
       setSaving(false)
-      setDeleteTarget(null)
+      setHideTarget(null)
     }
   }
 
@@ -350,8 +345,26 @@ export default function TraCuuGia() {
 
       <div className="card">
 
+        <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Trạng thái sản phẩm">
+          {[
+            [PRODUCT_STATUS.ACTIVE, 'Đang sử dụng'],
+            [PRODUCT_STATUS.INACTIVE, 'Đã ẩn'],
+          ].map(([status, label]) => (
+            <button
+              key={status}
+              type="button"
+              role="tab"
+              aria-selected={visibilityFilter === status}
+              onClick={() => setVisibilityFilter(status)}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${visibilityFilter === status ? 'bg-white text-[#1e3a5f] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* ── TOOLBAR ── */}
-        <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center">
+        <div className={`flex flex-col gap-3 mb-4 ${forceMobile ? '' : 'sm:flex-row sm:items-center'}`}>
 
           {/* Search — grows to fill available space */}
           <div className="relative flex-1">
@@ -362,7 +375,7 @@ export default function TraCuuGia() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên sản phẩm hoặc đơn vị tính..."
+              placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
               className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] hover:border-slate-300 transition"
             />
             {query && (
@@ -378,14 +391,14 @@ export default function TraCuuGia() {
 
           {/* Count + Refresh */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="text-xs text-slate-400 font-medium whitespace-nowrap hidden sm:block">
+            <span className={`text-xs text-slate-400 font-medium whitespace-nowrap ${forceMobile ? 'hidden' : 'hidden sm:block'}`}>
               {loading ? 'Đang tải...' : `${filtered.length} sản phẩm`}
             </span>
             <button
               type="button"
               onClick={fetchPriceBookFromSupabase}
               disabled={loading}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#1e3a5f] hover:bg-[#16304f] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              className={`${forceMobile ? 'w-full' : 'w-full sm:w-auto'} inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#1e3a5f] hover:bg-[#16304f] transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap`}
             >
               <IconRefresh />
               Làm mới
@@ -394,21 +407,22 @@ export default function TraCuuGia() {
         </div>
 
         {/* Count on mobile */}
-        <div className="text-xs text-slate-400 font-medium mb-3 sm:hidden">
+        <div className={`text-xs text-slate-400 font-medium mb-3 ${forceMobile ? '' : 'sm:hidden'}`}>
           {loading ? 'Đang tải...' : `${filtered.length} sản phẩm`}
         </div>
 
         {/* ══ DESKTOP TABLE ══ */}
-        <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
+        <div className={`${forceMobile ? 'hidden' : 'hidden md:block'} rounded-xl border border-slate-200 overflow-hidden`}>
           <div className="w-full overflow-x-auto">
             <table className="w-full min-w-[700px] text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Tên sản phẩm</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Mã SKU</th>
                   <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">ĐVT</th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap">Giá nhập</th>
                   <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap">Giá bán lẻ gợi ý</th>
-                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Xu hướng</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Trạng thái</th>
                   <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wide w-24">Thao tác</th>
                 </tr>
               </thead>
@@ -417,8 +431,6 @@ export default function TraCuuGia() {
                   Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} />)
                 ) : pageItems.length > 0 ? (
                   pageItems.map((item, idx) => {
-                    const pd = priceData[item.id] || {}
-                    const retail = pd.latest_retail_price || calcRetail(pd.latest_price)
                     return (
                       <tr
                         key={item.id}
@@ -426,7 +438,11 @@ export default function TraCuuGia() {
                       >
                         {/* Tên */}
                         <td className="px-4 py-3.5 font-semibold text-slate-900 max-w-[240px]">
-                          <span className="line-clamp-1">{item.product_name || '—'}</span>
+                          <span className="line-clamp-2 leading-snug">{item.product_name || '—'}</span>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-left font-mono text-xs font-semibold text-slate-600 whitespace-nowrap">
+                          {item.product_code || '—'}
                         </td>
 
                         {/* ĐVT */}
@@ -438,17 +454,18 @@ export default function TraCuuGia() {
 
                         {/* Giá nhập */}
                         <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">
-                          {formatVndExact(Number(pd.latest_price) || 0)}
+                          {formatStoredVnd(item.purchase_price, formatVndExact)}
                         </td>
 
                         {/* Giá bán */}
                         <td className="px-4 py-3.5 text-right font-bold text-[#1e3a5f] tabular-nums whitespace-nowrap">
-                          {formatVndExact(retail)}
+                          {formatStoredVnd(item.suggested_retail_price, formatVndExact)}
                         </td>
 
-                        {/* Xu hướng */}
                         <td className="px-4 py-3.5 text-center">
-                          <TrendIndicator trend={pd.trend} />
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === PRODUCT_STATUS.ACTIVE ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {item.status === PRODUCT_STATUS.ACTIVE ? 'Đang dùng' : 'Đã ẩn'}
+                          </span>
                         </td>
 
                         {/* Thao tác */}
@@ -462,14 +479,25 @@ export default function TraCuuGia() {
                             >
                               <IconPencil />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget(item)}
-                              title="Ẩn sản phẩm"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
-                            >
-                              <IconTrash />
-                            </button>
+                            {item.status === PRODUCT_STATUS.ACTIVE ? (
+                              <button
+                                type="button"
+                                onClick={() => setHideTarget(item)}
+                                title="Ẩn sản phẩm"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                              >
+                                <IconTrash />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => changeVisibility(item, PRODUCT_STATUS.ACTIVE)}
+                                title="Khôi phục sản phẩm"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all"
+                              >
+                                <IconRefresh />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -477,10 +505,14 @@ export default function TraCuuGia() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-14 text-center text-slate-400 text-sm">
-                      {isSupabaseConfigured()
-                        ? 'Chưa có dữ liệu giá sản phẩm. Hãy nhập hóa đơn đầu tiên!'
-                        : 'Chưa kết nối Supabase. Vui lòng cấu hình .env.local'}
+                    <td colSpan={7} className="px-4 py-14 text-center text-slate-400 text-sm">
+                      {loadError
+                        ? 'Không thể tải dữ liệu. Vui lòng thử lại.'
+                        : query.trim()
+                          ? 'Không tìm thấy sản phẩm phù hợp.'
+                          : isSupabaseConfigured()
+                            ? 'Danh mục hiện chưa có sản phẩm.'
+                            : 'Chưa kết nối Supabase. Vui lòng cấu hình .env.local'}
                     </td>
                   </tr>
                 )}
@@ -490,46 +522,38 @@ export default function TraCuuGia() {
         </div>
 
         {/* ══ MOBILE CARDS ══ */}
-        <div className="block md:hidden space-y-3">
+        <div className={`${forceMobile ? 'block' : 'block md:hidden'} space-y-3`}>
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
           ) : pageItems.length > 0 ? (
             pageItems.map((item) => {
-              const pd = priceData[item.id] || {}
-              const retail = pd.latest_retail_price || calcRetail(pd.latest_price)
               return (
                 <div key={item.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
-                  {/* Card Header: Product Name + Trend */}
-                  <div className="flex items-start justify-between gap-2 px-4 py-3 bg-slate-50/60 border-b border-slate-100">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-slate-900 text-sm leading-snug">{item.product_name || '—'}</div>
-                      <div className="text-xs text-slate-400 mt-0.5 tabular-nums">{pd.latest_date ? (() => { const d = new Date(String(pd.latest_date).replace(/\//g, '-') + 'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })() : '—'}</div>
-                    </div>
-                    <TrendBadge trend={pd.trend} />
+                  <div className="px-4 py-3 bg-slate-50/60 border-b border-slate-100">
+                    <div className="font-bold text-slate-900 text-sm leading-snug break-words">{item.product_name || '—'}</div>
+                    {(item.product_code || item.unit) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-500">
+                        {item.product_code && <span className="font-mono">Mã: {item.product_code}</span>}
+                        {item.unit && <span>ĐVT: {item.unit}</span>}
+                      </div>
+                    )}
                   </div>
 
                   {/* Card Body: Price Grid */}
                   <div className="px-4 py-3">
-                    {/* ĐVT pill */}
-                    <div className="mb-2.5">
-                      <span className="inline-flex items-center rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
-                        {item.unit || '—'}
-                      </span>
-                    </div>
-
                     {/* Prices */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <div className="text-xs text-slate-400 font-medium mb-0.5">Giá nhập / ĐVT</div>
+                        <div className="text-xs text-slate-400 font-medium mb-0.5">Giá nhập</div>
                         <div className="font-semibold text-slate-800 text-sm tabular-nums">
-                          {formatVndExact(Number(pd.latest_price) || 0)}
+                          {formatStoredVnd(item.purchase_price, formatVndExact)}
                         </div>
                       </div>
                       <div>
                         <div className="text-xs text-[#1e3a5f]/70 font-medium mb-0.5">Giá bán gợi ý</div>
                         <div className="font-bold text-[#1e3a5f] text-base tabular-nums">
-                          {formatVndExact(retail)}
+                          {formatStoredVnd(item.suggested_retail_price, formatVndExact)}
                         </div>
                       </div>
                     </div>
@@ -545,14 +569,25 @@ export default function TraCuuGia() {
                       <IconPencil size={13} />
                       Sửa
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(item)}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:border-rose-200 transition-all min-h-[40px]"
-                    >
-                      <IconTrash size={13} />
-                      Ẩn
-                    </button>
+                    {item.status === PRODUCT_STATUS.ACTIVE ? (
+                      <button
+                        type="button"
+                        onClick={() => setHideTarget(item)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 hover:border-rose-200 transition-all min-h-[40px]"
+                      >
+                        <IconTrash size={13} />
+                        Ẩn
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => changeVisibility(item, PRODUCT_STATUS.ACTIVE)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-all min-h-[40px]"
+                      >
+                        <IconRefresh size={13} />
+                        Khôi phục
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -651,6 +686,15 @@ export default function TraCuuGia() {
             {/* Modal Body */}
             <div className="px-6 py-5 space-y-4">
               <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Mã SKU</label>
+                <input
+                  type="text"
+                  value={editingProduct.product_code || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, product_code: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 font-mono text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition"
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Tên sản phẩm</label>
                 <input
                   type="text"
@@ -668,20 +712,9 @@ export default function TraCuuGia() {
                   className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Đơn giá nhập sau VAT (VND)</label>
-                <input
-                  type="number"
-                  value={editingProduct.latest_price}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, latest_price: Number(e.target.value) || 0 })}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition"
-                />
-                {editingProduct.latest_price > 0 && (
-                  <p className="mt-1.5 text-xs text-[#1e3a5f] font-medium">
-                    → Giá bán lẻ gợi ý: {calcRetail(editingProduct.latest_price).toLocaleString('vi-VN')}đ
-                  </p>
-                )}
-              </div>
+              <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+                Giá chỉ được cập nhật từ hóa đơn để giữ đúng nguồn gốc và lịch sử giá.
+              </p>
             </div>
 
             {/* Modal Footer */}
@@ -706,27 +739,28 @@ export default function TraCuuGia() {
         </div>
       )}
 
-      {/* ── Delete Confirm Dialog ── */}
-      {deleteTarget && (
+      {/* ── Hide Confirm Dialog ── */}
+      {hideTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="px-6 py-5">
               <h3 className="text-base font-bold text-slate-900 mb-2">Ẩn sản phẩm khỏi danh mục?</h3>
-              <p className="text-sm text-slate-500">
-                Sản phẩm <span className="font-semibold text-slate-800">{deleteTarget.product_name}</span> sẽ bị ẩn khỏi danh sách tra cứu. Bạn có thể khôi phục lại sau.
+              <p className="text-sm leading-relaxed text-slate-500">
+                <span className="font-semibold text-slate-800">{hideTarget.product_name}</span><br />
+                Sản phẩm sẽ được ẩn khỏi danh sách tra cứu. Dữ liệu hóa đơn và lịch sử giá vẫn được giữ nguyên.
               </p>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
               <button
                 type="button"
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => setHideTarget(null)}
                 className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition"
               >
                 Hủy
               </button>
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => changeVisibility(hideTarget, PRODUCT_STATUS.INACTIVE)}
                 disabled={saving}
                 className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >

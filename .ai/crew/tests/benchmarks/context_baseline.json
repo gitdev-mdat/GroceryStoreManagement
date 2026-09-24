@@ -1,0 +1,36 @@
+{
+  "fixture": "context_benchmark.py",
+  "stage": "before",
+  "status": "DONE_WITH_WARNINGS",
+  "repair_count": 0,
+  "roles": {
+    "lead": {
+      "requests": 3,
+      "prompt_tokens": 2057,
+      "completion_tokens": 840,
+      "cached_prompt_tokens": 0,
+      "iterations": 3
+    },
+    "implementer": {
+      "requests": 5,
+      "prompt_tokens": 9794,
+      "completion_tokens": 781,
+      "cached_prompt_tokens": 0,
+      "iterations": 5
+    },
+    "reviewer": {
+      "requests": 1,
+      "prompt_tokens": 4331,
+      "completion_tokens": 87,
+      "cached_prompt_tokens": 0,
+      "iterations": 1
+    }
+  },
+  "totals": {
+    "requests": 9,
+    "prompt_tokens": 16182,
+    "completion_tokens": 1708,
+    "cached_prompt_tokens": 0,
+    "iterations": 9
+  }
+}

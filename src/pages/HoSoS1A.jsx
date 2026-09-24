@@ -10,6 +10,12 @@ import AddTicketForm from '../components/s1a/AddTicketForm'
 import AddMonthlyRevenueForm from '../components/s1a/AddMonthlyRevenueForm'
 import SoS1aHKD from '../components/s1a/SoS1aHKD'
 import CloseBookForm from '../components/s1a/CloseBookForm'
+import S2aImportWizard from '../components/s1a/S2aImportWizard'
+
+// Feature flag — Sprint 1: PDF import UI only.
+// Enable during development; disable before production release
+// until PDF analysis is fully implemented.
+const FEATURE_S2A_IMPORT_ENABLED = true
 
 // ─────────────────────────────────────────
 // Hub Page - Navigation Cards
@@ -82,6 +88,18 @@ const NAV_CARDS = [
       </svg>
     ),
   },
+  ...(FEATURE_S2A_IMPORT_ENABLED ? [{
+    id: 'importHistory',
+    title: 'Nhập dữ liệu lịch sử',
+    desc: 'Chuyển sổ S2A cũ vào S1A',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" y1="3" x2="12" y2="15" />
+      </svg>
+    ),
+  }] : []),
 ]
 
 // ─────────────────────────────────────────
@@ -203,7 +221,7 @@ export default function HoSoS1A() {
 
           {/* Secondary Actions (Full width) */}
           <div className="grid grid-cols-1">
-            {NAV_CARDS.filter(c => c.id === 'closeBook').map((card) => (
+            {NAV_CARDS.filter(c => c.id === 'closeBook' || c.id === 'importHistory').map((card) => (
               <button
                 key={card.id}
                 type="button"
@@ -253,6 +271,7 @@ export default function HoSoS1A() {
       {view === 'batchAdd' && <AddMonthlyRevenueForm onBack={handleBack} />}
       {view === 'ledger' && <SoS1aHKD onBack={handleBack} />}
       {view === 'closeBook' && <CloseBookForm onBack={handleBack} />}
+      {view === 'importHistory' && <S2aImportWizard onBack={handleBack} />}
     </div>
   )
 }
