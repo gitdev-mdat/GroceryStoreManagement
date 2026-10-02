@@ -5,6 +5,7 @@ import { formatDateDisplay } from '../components/FormatDate'
 import { formatVndExact } from '../components/FormatNumber'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
+import ZoomableImageViewer from '../components/ZoomableImageViewer'
 
 const PAGE_SIZE = 10
 
@@ -151,21 +152,6 @@ function InvoiceProductDetails({ products, loading, highlightedProductId }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function ImageViewer({ imageUrl, onClose }) {
-  if (!imageUrl) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="relative max-h-[90vh] w-full max-w-3xl rounded-2xl bg-black p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-medium text-white/60">Xem ảnh hóa đơn</span>
-          <button type="button" className="rounded-lg bg-white/10 px-3 py-1 text-sm text-white transition hover:bg-white/20" onClick={onClose}>Đóng</button>
-        </div>
-        <img src={imageUrl} alt="Ảnh hóa đơn" className="max-h-[80vh] w-full rounded-xl object-contain" />
-      </div>
     </div>
   )
 }
@@ -464,7 +450,7 @@ export default function NhatKyHoaDon({ loadInvoices = loadLiveInvoices, loadInvo
           onViewImage={setViewerImage}
         />
         <ToastContainer />
-        <ImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
+        <ZoomableImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
       </div>
     )
   }
@@ -813,7 +799,7 @@ export default function NhatKyHoaDon({ loadInvoices = loadLiveInvoices, loadInvo
       <ToastContainer />
 
       {/* Image Viewer */}
-      <ImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
+      <ZoomableImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
     </div>
   )
 }
