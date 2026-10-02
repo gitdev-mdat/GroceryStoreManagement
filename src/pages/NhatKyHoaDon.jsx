@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { Fragment, useState, useMemo, useEffect, useCallback } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { formatDateDisplay } from '../components/FormatDate'
 import { formatVndExact } from '../components/FormatNumber'
@@ -115,6 +116,170 @@ function MobileCardSkeleton() {
   )
 }
 
+function InvoiceProductDetails({ products, loading, highlightedProductId }) {
+  if (loading) {
+    return <div className="space-y-2 p-4">{[1, 2].map(index => <div key={index} className="h-14 animate-pulse rounded-lg bg-slate-100" />)}</div>
+  }
+  if (!products.length) return <div className="p-4 text-center text-sm text-slate-400">Không có sản phẩm trong hóa đơn này.</div>
+  return (
+    <div className="space-y-2 bg-slate-50 px-4 py-3">
+      <div className="mb-1 flex items-center justify-between">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Chi tiết sản phẩm</h4>
+        <span className="text-xs text-slate-400">{products.length} mặt hàng</span>
+      </div>
+      {products.map((item, index) => {
+        const retailPrice = calculateSmartRetailPrice(item.unit_price_after_vat)
+        const isGift = item.row_type === 'KM'
+        const highlighted = highlightedProductId && item.product_id === highlightedProductId
+        return (
+          <div key={item.id} data-product-id={item.product_id} className={`rounded-lg border bg-white p-3 transition ${highlighted ? 'border-blue-300 ring-2 ring-blue-200' : isGift ? 'border-amber-200' : 'border-slate-100'}`}>
+            {highlighted && <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">Sản phẩm đang đối chiếu</div>}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="text-xs text-slate-400">{index + 1}.</span>
+                <span className="break-words text-sm font-medium text-slate-800">{item.products?.product_name || '—'}</span>
+                {isGift && <span className="rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">Quà tặng</span>}
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-slate-500">SL: <strong>{(item.quantity || 0).toLocaleString('vi-VN')}</strong> {item.products?.unit || ''}</span>
+            </div>
+            {!isGift && (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
+                <span className="text-slate-500">Giá nhập: <strong className="tabular-nums text-slate-700">{Number(item.unit_price_after_vat || 0).toLocaleString('vi-VN')}đ</strong></span>
+                <span className="font-semibold tabular-nums text-[#1e3a5f]">Bán lẻ: {retailPrice.toLocaleString('vi-VN')}đ</span>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ImageViewer({ imageUrl, onClose }) {
+  if (!imageUrl) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="relative max-h-[90vh] w-full max-w-3xl rounded-2xl bg-black p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-white/60">Xem ảnh hóa đơn</span>
+          <button type="button" className="rounded-lg bg-white/10 px-3 py-1 text-sm text-white transition hover:bg-white/20" onClick={onClose}>Đóng</button>
+        </div>
+        <img src={imageUrl} alt="Ảnh hóa đơn" className="max-h-[80vh] w-full rounded-xl object-contain" />
+      </div>
+    </div>
+  )
+}
+
+function FocusedSourceView({
+  invoice,
+  products,
+  invoiceLoading,
+  productsLoading,
+  unavailable,
+  error,
+  highlightedProductId,
+  onBack,
+  onRetry,
+  onViewImage,
+}) {
+  const sourceLine = products.find(item => item.product_id === highlightedProductId)
+  const supplier = invoice?.suppliers || {}
+  const invoiceNumber = invoice?.invoice_number || invoice?.serial_number || '—'
+
+  return (
+    <div className="mx-auto w-full max-w-4xl">
+      <button type="button" onClick={onBack} className="mb-3 inline-flex min-h-[40px] items-center gap-1 text-sm font-semibold text-[#1e3a5f] hover:underline">
+        <IconChevronLeft size={15} /> Quay lại tra cứu giá
+      </button>
+
+      <div className="mb-4">
+        <h1 className="m-0 text-xl font-bold text-brand-700 lg:text-2xl">VAT nguồn của sản phẩm</h1>
+        <p className="mt-1 text-sm text-slate-500">Đối chiếu giá nhập với hóa đơn gốc.</p>
+      </div>
+
+      {invoiceLoading ? (
+        <div className="card space-y-4">
+          <div className="h-28 animate-pulse rounded-xl bg-slate-100" />
+          <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+      ) : unavailable ? (
+        <div className="card border-amber-200 bg-amber-50 py-10 text-center">
+          <div className="text-base font-bold text-amber-800">Hóa đơn nguồn không còn khả dụng</div>
+          <p className="mt-2 text-sm text-amber-700">Liên kết nguồn được giữ nguyên và không được thay thế bằng hóa đơn khác.</p>
+        </div>
+      ) : error || !invoice ? (
+        <div className="card border-rose-200 bg-rose-50 py-10 text-center">
+          <div className="text-base font-bold text-rose-800">Không thể tải hóa đơn nguồn</div>
+          <button type="button" onClick={onRetry} className="mt-4 min-h-[40px] rounded-lg bg-white px-4 text-sm font-semibold text-rose-700 shadow-sm">Thử lại</button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
+            <div className="bg-blue-50/70 px-4 py-4 sm:px-5">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-blue-700">Sản phẩm đang đối chiếu</div>
+              {productsLoading ? (
+                <div className="mt-3 h-14 animate-pulse rounded-lg bg-blue-100/70" />
+              ) : sourceLine ? (
+                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="break-words text-base font-bold leading-snug text-slate-900">{sourceLine.products?.product_name || '—'}</div>
+                    {sourceLine.products?.unit && <div className="mt-1 text-xs text-slate-500">ĐVT: {sourceLine.products.unit}</div>}
+                  </div>
+                  <div className="shrink-0 sm:text-right">
+                    <div className="text-xs font-medium text-slate-500">Giá nhập từ hóa đơn này</div>
+                    <div className="mt-0.5 text-xl font-bold tabular-nums text-[#1e3a5f]">{formatVndExact(Number(sourceLine.unit_price_after_vat) || 0)} ₫</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-amber-700">Không tìm thấy dòng sản phẩm đã liên kết trong hóa đơn này.</div>
+              )}
+            </div>
+
+            <div className="px-4 py-4 sm:px-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Hóa đơn nguồn</span>
+                    <TypeBadge type={invoice.invoice_type} />
+                  </div>
+                  <div className="mt-2 break-words text-base font-bold text-slate-900">{supplier.company_name || 'Không có thông tin nhà cung cấp'}</div>
+                  {supplier.tax_code && <div className="mt-1 text-xs text-slate-500">MST: <span className="tabular-nums">{supplier.tax_code}</span></div>}
+                </div>
+                <div className="grid shrink-0 grid-cols-2 gap-x-5 gap-y-2 text-sm sm:text-right">
+                  <div>
+                    <div className="text-xs text-slate-400">Ngày hóa đơn</div>
+                    <div className="mt-0.5 font-semibold tabular-nums text-slate-700">{invoice.issue_date ? formatDateDisplay(invoice.issue_date) : '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-400">Số hóa đơn</div>
+                    <div className="mt-0.5 break-all font-semibold tabular-nums text-slate-700">{invoiceNumber}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-400">Tổng thanh toán</div>
+                    <div className="mt-0.5 font-bold tabular-nums text-emerald-700">{formatVndExact(Number(invoice.total_amount) || 0)} ₫</div>
+                  </div>
+                </div>
+              </div>
+
+              {invoice.image_url ? (
+                <button type="button" onClick={() => onViewImage(invoice.image_url)} className="mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-[#1e3a5f] transition hover:bg-blue-100 sm:w-auto">
+                  <IconImage size={16} /> Xem ảnh hóa đơn gốc
+                </button>
+              ) : (
+                <div className="mt-4 text-xs text-slate-400">Hóa đơn này chưa có ảnh gốc.</div>
+              )}
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <InvoiceProductDetails products={products} loading={productsLoading} highlightedProductId={highlightedProductId} />
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function calculateSmartRetailPrice(price) {
   if (!price || price <= 0) return 0
@@ -139,8 +304,44 @@ function generateMonthOptions() {
 
 const MONTH_OPTIONS = generateMonthOptions()
 
+async function loadLiveInvoices({ linkedInvoiceId, filterMonth, filterType }) {
+  let query = supabase
+    .from('invoices')
+    .select('id, serial_number, invoice_number, issue_date, invoice_type, total_amount, notes, image_url, supplier_id, suppliers(company_name, tax_code)')
+    .order('issue_date', { ascending: false })
+  if (linkedInvoiceId) {
+    query = query.eq('id', linkedInvoiceId)
+  } else if (filterMonth) {
+    const [year, month] = filterMonth.split('-')
+    const startDate = `${year}-${month}-01`
+    const endDate = month === '12' ? `${parseInt(year) + 1}-01-01` : `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`
+    query = query.gte('issue_date', startDate).lt('issue_date', endDate)
+  }
+  if (!linkedInvoiceId && filterType === 'VAT') query = query.eq('invoice_type', 'VAT')
+  else if (!linkedInvoiceId && filterType === 'RETAIL') query = query.eq('invoice_type', 'RETAIL')
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+async function loadLiveInvoiceProducts(invoiceId) {
+  const { data, error } = await supabase
+    .from('price_history')
+    .select('*, products(product_name, unit)')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function NhatKyHoaDon() {
+export default function NhatKyHoaDon({ loadInvoices = loadLiveInvoices, loadInvoiceProducts = loadLiveInvoiceProducts }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const linkedInvoiceId = searchParams.get('invoiceId') || ''
+  const highlightedProductId = searchParams.get('productId') || ''
+  const isSourceView = Boolean(linkedInvoiceId) && searchParams.get('source') === 'price-book'
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -156,48 +357,30 @@ export default function NhatKyHoaDon() {
   const [deleteId, setDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [viewerImage, setViewerImage] = useState(null)
+  const [linkedInvoiceUnavailable, setLinkedInvoiceUnavailable] = useState(false)
+  const [invoiceLoadError, setInvoiceLoadError] = useState(null)
 
   const { showToast, ToastContainer } = useToast()
 
   const fetchInvoices = useCallback(async () => {
     if (!isSupabaseConfigured()) { setLoading(false); return }
     setLoading(true)
-    console.log('[DEBUG NhatKyHoaDon] supabase URL:', import.meta.env.VITE_SUPABASE_URL)
+    setInvoiceLoadError(null)
     try {
-      let q = supabase
-        .from('invoices')
-        .select(`id, serial_number, invoice_number, issue_date, invoice_type, total_amount, notes, image_url, supplier_id, suppliers(company_name, tax_code)`)
-        .order('issue_date', { ascending: false })
-
-      if (filterMonth) {
-        const [year, month] = filterMonth.split('-')
-        const startDate = `${year}-${month}-01`
-        const endDate = month === '12'
-          ? `${parseInt(year) + 1}-01-01`
-          : `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`
-        console.log('[DEBUG NhatKyHoaDon] filterMonth:', filterMonth, '→ startDate:', startDate, 'endDate:', endDate)
-        q = q.gte('issue_date', startDate).lt('issue_date', endDate)
-      }
-      if (filterType === 'VAT') q = q.eq('invoice_type', 'VAT')
-      else if (filterType === 'RETAIL') q = q.eq('invoice_type', 'RETAIL')
-
-      console.log('[DEBUG NhatKyHoaDon] filterType:', filterType)
-      const { data, error } = await q
-      console.log('[DEBUG NhatKyHoaDon] fetchInvoices returned rows:', data?.length ?? 0)
-      console.log('[DEBUG NhatKyHoaDon] fetchInvoices data:', JSON.stringify(data, null, 2))
-      console.log('[DEBUG NhatKyHoaDon] fetchInvoices error:', JSON.stringify(error, null, 2))
-      if (error) throw error
-      setInvoices(data || [])
+      const data = await loadInvoices({ linkedInvoiceId, filterMonth, filterType })
+      setInvoices(data)
+      setLinkedInvoiceUnavailable(Boolean(linkedInvoiceId && !data.some(invoice => invoice.id === linkedInvoiceId)))
       setPage(0)
       setExpandedInvoiceId(null)
       setInvoiceProducts([])
     } catch (err) {
       console.error('Lỗi fetch hóa đơn:', err)
+      setInvoiceLoadError(err)
       showToast('Không thể tải danh sách hóa đơn.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [filterMonth, filterType])
+  }, [filterMonth, filterType, linkedInvoiceId, loadInvoices])
 
   useEffect(() => { fetchInvoices() }, [fetchInvoices])
 
@@ -228,19 +411,18 @@ export default function NhatKyHoaDon() {
     setIsLoadingProducts(true)
     setInvoiceProducts([])
     try {
-      const { data, error } = await supabase
-        .from('price_history')
-        .select('*, products(product_name, unit)')
-        .eq('invoice_id', invoiceId)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      setInvoiceProducts(data || [])
+      setInvoiceProducts(await loadInvoiceProducts(invoiceId))
     } catch {
       showToast('Không thể tải chi tiết sản phẩm.', 'error')
     } finally {
       setIsLoadingProducts(false)
     }
   }
+
+  useEffect(() => {
+    if (!linkedInvoiceId || loading || linkedInvoiceUnavailable || expandedInvoiceId === linkedInvoiceId) return
+    handleToggleExpand(linkedInvoiceId)
+  }, [expandedInvoiceId, linkedInvoiceId, linkedInvoiceUnavailable, loading])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -264,6 +446,28 @@ export default function NhatKyHoaDon() {
   const deleteDialogDisplay = deleteDialogInvoice?.invoice_number || deleteDialogInvoice?.serial_number || ''
 
   const cleanStr = (v) => v && v !== 'null' && v !== '' ? v : null
+  const focusedInvoice = linkedInvoiceId ? invoices.find(invoice => invoice.id === linkedInvoiceId) : null
+
+  if (isSourceView) {
+    return (
+      <div>
+        <FocusedSourceView
+          invoice={focusedInvoice}
+          products={invoiceProducts}
+          invoiceLoading={loading}
+          productsLoading={isLoadingProducts}
+          unavailable={linkedInvoiceUnavailable}
+          error={invoiceLoadError}
+          highlightedProductId={highlightedProductId}
+          onBack={() => navigate(-1)}
+          onRetry={fetchInvoices}
+          onViewImage={setViewerImage}
+        />
+        <ToastContainer />
+        <ImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
+      </div>
+    )
+  }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
@@ -271,10 +475,21 @@ export default function NhatKyHoaDon() {
 
       {/* Page Header */}
       <div className="mb-4">
-        <h1 className="text-xl font-bold text-brand-700 m-0 lg:text-2xl">Nhật ký hóa đơn</h1>
+        {location.state?.returnTo && (
+          <button type="button" onClick={() => navigate(-1)} className="mb-2 inline-flex min-h-[40px] items-center gap-1 text-sm font-semibold text-[#1e3a5f] hover:underline">
+            <IconChevronLeft size={15} /> Quay lại tra cứu giá
+          </button>
+        )}
+        <h1 className="m-0 text-xl font-bold text-brand-700 lg:text-2xl">Nhật ký hóa đơn</h1>
       </div>
 
       <div className="card">
+
+        {linkedInvoiceId && (
+          <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${linkedInvoiceUnavailable ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-blue-100 bg-blue-50 text-blue-800'}`}>
+            {linkedInvoiceUnavailable ? 'Hóa đơn nguồn không còn khả dụng.' : 'Đang mở hóa đơn nguồn chính xác từ tra cứu giá.'}
+          </div>
+        )}
 
         {/* ── COHESIVE TOOLBAR ── */}
         <div className="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center">
@@ -388,8 +603,8 @@ export default function NhatKyHoaDon() {
                   const displayInvoiceNumber = cleanStr(row.invoice_number)
 
                   return (
+                    <Fragment key={row.id}>
                     <tr
-                      key={row.id}
                       className={`transition-colors hover:bg-blue-50/30 ${idx % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'}`}
                     >
                       <td className="px-4 py-3.5 text-slate-500 tabular-nums text-xs text-center whitespace-nowrap">
@@ -418,6 +633,14 @@ export default function NhatKyHoaDon() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleExpand(row.id)}
+                            title="Xem chi tiết"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#1e3a5f] hover:bg-blue-50 transition-all"
+                          >
+                            <IconChevronDown />
+                          </button>
                           {row.image_url && (
                             <button
                               type="button"
@@ -439,6 +662,10 @@ export default function NhatKyHoaDon() {
                         </div>
                       </td>
                     </tr>
+                    {expandedInvoiceId === row.id && (
+                      <tr className="bg-slate-50"><td colSpan={8} className="p-0"><InvoiceProductDetails products={invoiceProducts} loading={isLoadingProducts} highlightedProductId={highlightedProductId} /></td></tr>
+                    )}
+                    </Fragment>
                   )
                 })
               ) : (
@@ -531,46 +758,7 @@ export default function NhatKyHoaDon() {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="border-t border-slate-100">
-                      {isLoadingProducts ? (
-                        <div className="p-4 space-y-2">
-                          {[1, 2].map(i => <div key={i} className="h-14 rounded-lg bg-slate-100 animate-pulse" />)}
-                        </div>
-                      ) : invoiceProducts.length > 0 ? (
-                        <div className="bg-slate-50 px-4 py-3 space-y-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Chi tiết sản phẩm</h4>
-                            <span className="text-xs text-slate-400">{invoiceProducts.length} mặt hàng</span>
-                          </div>
-                          {invoiceProducts.map((item, idx) => {
-                            const retailPrice = calculateSmartRetailPrice(item.unit_price_after_vat)
-                            const isGift = item.row_type === 'KM'
-                            return (
-                              <div key={item.id} className={`bg-white rounded-lg p-3 border ${isGift ? 'border-amber-200' : 'border-slate-100'}`}>
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-xs text-slate-400">{idx + 1}.</span>
-                                    <span className="text-sm font-medium text-slate-800">{item.products?.product_name || '—'}</span>
-                                    {isGift && (
-                                      <span className="rounded-md bg-amber-100 border border-amber-200 px-1.5 py-0.5 text-xs font-medium text-amber-700">Quà tặng</span>
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-slate-500 whitespace-nowrap tabular-nums">
-                                    SL: <strong>{(item.quantity || 0).toLocaleString('vi-VN')}</strong> {item.products?.unit || ''}
-                                  </span>
-                                </div>
-                                {!isGift && (
-                                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100 text-xs">
-                                    <span className="text-slate-500">Giá nhập: <strong className="text-slate-700 tabular-nums">{Number(item.unit_price_after_vat || 0).toLocaleString('vi-VN')}đ</strong></span>
-                                    <span className="text-[#1e3a5f] font-semibold tabular-nums">Bán lẻ: {retailPrice.toLocaleString('vi-VN')}đ</span>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-4 text-center text-sm text-slate-400">Không có sản phẩm trong hóa đơn này.</div>
-                      )}
+                      <InvoiceProductDetails products={invoiceProducts} loading={isLoadingProducts} highlightedProductId={highlightedProductId} />
                     </div>
                   )}
                 </div>
@@ -625,19 +813,7 @@ export default function NhatKyHoaDon() {
       <ToastContainer />
 
       {/* Image Viewer */}
-      {viewerImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setViewerImage(null)}>
-          <div className="relative max-h-[90vh] w-full max-w-3xl rounded-2xl bg-black p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/60 font-medium">Xem ảnh hóa đơn</span>
-              <button type="button" className="rounded-lg bg-white/10 px-3 py-1 text-sm text-white hover:bg-white/20 transition" onClick={() => setViewerImage(null)}>
-                Đóng
-              </button>
-            </div>
-            <img src={viewerImage} alt="Ảnh hóa đơn" className="max-h-[80vh] w-full rounded-xl object-contain" />
-          </div>
-        </div>
-      )}
+      <ImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
     </div>
   )
 }

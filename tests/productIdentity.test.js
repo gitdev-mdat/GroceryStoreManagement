@@ -45,6 +45,8 @@ test('price book preserves and searches the separate SKU', () => {
     status: 'ACTIVE',
     purchase_price: REAL_INVOICE_FIXTURE.purchasePrice,
     suggested_retail_price: REAL_INVOICE_FIXTURE.suggestedRetailPrice,
+    vat_source_count: 0,
+    current_price_source: null,
   })
   assert.equal(filterPriceBook(items, '01sb10').length, 1)
 })

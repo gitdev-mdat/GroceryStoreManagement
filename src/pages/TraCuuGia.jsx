@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { formatVndExact } from '../components/FormatNumber'
+import { formatDateDisplay } from '../components/FormatDate'
 import { useToast } from '../components/Toast'
 import { queryPriceBook, filterPriceBook, formatStoredVnd } from '../lib/priceBook'
 import { canonicalNameKey, normalizeCanonicalName, normalizeProductCode, normalizeUnitDisplay, normalizeUnitKey } from '../lib/productResolver'
 import { createSupabaseProductVisibilityRepository, PRODUCT_STATUS, setProductVisibility } from '../lib/productVisibility'
+import { invoiceDetailHref, queryProductVatSources } from '../lib/vatSources'
 
 const PAGE_SIZE = 10
 
@@ -60,6 +63,93 @@ const IconClose = ({ size = 16 }) => (
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 )
+
+const IconReceipt = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2-2-2Z" />
+    <path d="M16 8h-6M16 12h-6M13 16h-3" />
+  </svg>
+)
+
+function VatSourceActions({ product, onOpenInvoice, onOpenHistory }) {
+  const count = Number(product.vat_source_count || 0)
+  const current = product.current_price_source
+  if (!count) return null
+  if (count === 1 && current && !current.available) {
+    return <div className="mt-2 text-xs text-amber-700">Hóa đơn nguồn không còn khả dụng</div>
+  }
+  if (count === 1 && current) {
+    return (
+      <button type="button" onClick={() => onOpenInvoice(current, product.id)} className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 text-left text-xs font-semibold text-[#1e3a5f] hover:underline">
+        <IconReceipt /> Xem VAT nguồn{current.invoiceDate ? ` · ${formatDateDisplay(current.invoiceDate)}` : ''}
+      </button>
+    )
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      {current && !current.available && <span className="text-xs text-amber-700">Nguồn giá hiện tại không còn khả dụng</span>}
+      {current?.available && (
+        <button type="button" onClick={() => onOpenInvoice(current, product.id)} className="inline-flex min-h-[36px] items-center gap-1.5 text-left text-xs font-semibold text-[#1e3a5f] hover:underline">
+          <IconReceipt /> VAT nguồn{current.invoiceDate ? ` · ${formatDateDisplay(current.invoiceDate)}` : ''}
+        </button>
+      )}
+      <button type="button" onClick={() => onOpenHistory(product)} className="inline-flex min-h-[36px] items-center text-left text-xs font-semibold text-slate-600 hover:text-[#1e3a5f] hover:underline">
+        Xem {count} hóa đơn VAT →
+      </button>
+    </div>
+  )
+}
+
+function VatHistorySheet({ product, sources, loading, error, onClose, onRetry, onOpenInvoice }) {
+  if (!product) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 sm:items-center sm:p-4" onClick={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="vat-history-title" className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+        <header className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
+          <div className="min-w-0">
+            <h2 id="vat-history-title" className="text-base font-bold text-slate-900">VAT liên quan</h2>
+            <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{product.product_name}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Đóng lịch sử VAT" className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><IconClose /></button>
+        </header>
+        <div className="overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div aria-label="Đang tải lịch sử VAT" className="space-y-3">{[1, 2, 3].map(index => <div key={index} className="h-32 animate-pulse rounded-xl bg-slate-100" />)}</div>
+          ) : error ? (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-center">
+              <p className="text-sm text-rose-700">Không thể tải lịch sử VAT.</p>
+              <button type="button" onClick={onRetry} className="mt-3 min-h-[40px] rounded-lg bg-white px-4 text-sm font-semibold text-rose-700 shadow-sm">Thử lại</button>
+            </div>
+          ) : sources.length ? (
+            <div className="space-y-3">
+              {sources.map(source => (
+                <article key={source.historyId || source.invoiceId} className={`rounded-xl border p-4 ${source.isCurrentPriceSource ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-800">{source.invoiceDate ? formatDateDisplay(source.invoiceDate) : 'Không rõ ngày'}</div>
+                      <div className="mt-1 line-clamp-2 break-words text-sm leading-snug text-slate-700">{source.supplierName || 'Không có thông tin nhà cung cấp'}</div>
+                    </div>
+                    {source.isCurrentPriceSource && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-700">Nguồn giá hiện tại</span>}
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs text-slate-500">
+                    <div className="break-all">Số HĐ: <strong className="text-slate-700">{source.invoiceNumber || '—'}</strong></div>
+                    <div>Giá nhập: <strong className="text-slate-800">{formatStoredVnd(source.purchasePrice, formatVndExact)}</strong></div>
+                    {source.quantity != null && <div>Số lượng: <strong className="text-slate-700">{Number(source.quantity).toLocaleString('vi-VN')}</strong></div>}
+                  </div>
+                  {source.available ? (
+                    <button type="button" onClick={() => onOpenInvoice(source, product.id)} className="mt-3 min-h-[40px] w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-[#1e3a5f] hover:bg-blue-50">Xem hóa đơn</button>
+                  ) : (
+                    <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">Hóa đơn nguồn không còn khả dụng</div>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : <div className="py-10 text-center text-sm text-slate-400">Chưa có VAT nguồn.</div>}
+        </div>
+      </section>
+    </div>
+  )
+}
 
 // ── Trend Indicator ───────────────────────────────────────────────────────────
 function TrendIndicator({ trend }) {
@@ -169,18 +259,26 @@ function SkeletonCard() {
 // ── Main Component ────────────────────────────────────────────────────────────
 const loadLivePriceBook = status => queryPriceBook(supabase, { status })
 
-export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobile = false }) {
+export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, loadVatSources = productId => queryProductVatSources(supabase, productId), forceMobile = false }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState([])
   const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [hideTarget, setHideTarget] = useState(null)
-  const [visibilityFilter, setVisibilityFilter] = useState(PRODUCT_STATUS.ACTIVE)
+  const [visibilityFilter, setVisibilityFilter] = useState(() => searchParams.get('status') === PRODUCT_STATUS.INACTIVE ? PRODUCT_STATUS.INACTIVE : PRODUCT_STATUS.ACTIVE)
   const [saving, setSaving] = useState(false)
+  const [vatHistoryProduct, setVatHistoryProduct] = useState(null)
+  const [vatSources, setVatSources] = useState([])
+  const [vatSourcesLoading, setVatSourcesLoading] = useState(false)
+  const [vatSourcesError, setVatSourcesError] = useState(null)
   const loadRequestRef = useRef(0)
+  const filterStateRef = useRef({ query, visibilityFilter })
 
   const { showToast, ToastContainer } = useToast()
 
@@ -203,6 +301,26 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
   }, [loadPriceBook, visibilityFilter])
 
   useEffect(() => { fetchPriceBookFromSupabase() }, [fetchPriceBookFromSupabase])
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('q')
+    next.delete('status')
+    next.delete('page')
+    if (query) next.set('q', query)
+    if (visibilityFilter === PRODUCT_STATUS.INACTIVE) next.set('status', visibilityFilter)
+    if (page > 1) next.set('page', String(page))
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true })
+  }, [page, query, searchParams, setSearchParams, visibilityFilter])
+
+  useEffect(() => {
+    if (loading) return
+    const saved = sessionStorage.getItem('tra-cuu-gia-scroll')
+    if (saved != null) {
+      sessionStorage.removeItem('tra-cuu-gia-scroll')
+      requestAnimationFrame(() => window.scrollTo({ top: Number(saved) || 0 }))
+    }
+  }, [loading])
 
   useEffect(() => {
     if (!import.meta.env.DEV || !new URLSearchParams(window.location.search).has('catalogAudit')) return
@@ -246,7 +364,11 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
 
   const filtered = useMemo(() => filterPriceBook(products, query), [products, query])
 
-  useEffect(() => { setPage(1) }, [query, visibilityFilter])
+  useEffect(() => {
+    const previous = filterStateRef.current
+    if (previous.query !== query || previous.visibilityFilter !== visibilityFilter) setPage(1)
+    filterStateRef.current = { query, visibilityFilter }
+  }, [query, visibilityFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -263,6 +385,28 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
       unit: item.unit,
     })
     setIsEditModalOpen(true)
+  }
+
+  const openInvoice = (source, productId) => {
+    const href = invoiceDetailHref(source, productId)
+    if (!href) return
+    sessionStorage.setItem('tra-cuu-gia-scroll', String(window.scrollY))
+    navigate(href, { state: { returnTo: `${location.pathname}${location.search}` } })
+  }
+
+  const fetchVatHistory = async product => {
+    setVatHistoryProduct(product)
+    setVatSourcesLoading(true)
+    setVatSourcesError(null)
+    try {
+      setVatSources(await loadVatSources(product.id))
+    } catch (error) {
+      console.error('Lỗi tải lịch sử VAT:', error)
+      setVatSources([])
+      setVatSourcesError(error)
+    } finally {
+      setVatSourcesLoading(false)
+    }
   }
 
   const handleSaveEditProduct = async () => {
@@ -455,6 +599,7 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
                         {/* Giá nhập */}
                         <td className="px-4 py-3.5 text-right font-semibold text-slate-800 tabular-nums whitespace-nowrap">
                           {formatStoredVnd(item.purchase_price, formatVndExact)}
+                          <VatSourceActions product={item} onOpenInvoice={openInvoice} onOpenHistory={fetchVatHistory} />
                         </td>
 
                         {/* Giá bán */}
@@ -557,6 +702,7 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
                         </div>
                       </div>
                     </div>
+                    <VatSourceActions product={item} onOpenInvoice={openInvoice} onOpenHistory={fetchVatHistory} />
                   </div>
 
                   {/* Card Footer: Actions */}
@@ -770,6 +916,16 @@ export default function TraCuuGia({ loadPriceBook = loadLivePriceBook, forceMobi
           </div>
         </div>
       )}
+
+      <VatHistorySheet
+        product={vatHistoryProduct}
+        sources={vatSources}
+        loading={vatSourcesLoading}
+        error={vatSourcesError}
+        onClose={() => setVatHistoryProduct(null)}
+        onRetry={() => fetchVatHistory(vatHistoryProduct)}
+        onOpenInvoice={openInvoice}
+      />
 
       <ToastContainer />
     </div>
